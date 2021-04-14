@@ -1,11 +1,13 @@
 
 import math
-import re
 import numpy as np
 import matplotlib.pyplot as plt
 from operator import itemgetter
 
 #---------------------------------------------------------------------------
+from sc.utils import clean_subj_id
+
+
 def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None):
     """
     Plot the mean value for each condition
@@ -156,13 +158,4 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
 
     _format_conds_graph(ax, cond_names, conditions, dy, len(conditions), ymax, font_size)
     ax.legend([clean_subj_id(s) for s in subj_ids], fontsize=5)
-
-
-#---------------------------------------------------------------------------
-def clean_subj_id(full_subj_id):
-    m = re.match('^(\\d+)([A-Z]+)$', full_subj_id)
-    if m is None:
-        return full_subj_id
-    else:
-        return int(m.group(1))
 

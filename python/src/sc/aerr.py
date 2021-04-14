@@ -2,12 +2,14 @@
 import openpyxl
 import re
 
+import sc.utils as u
+
 lexical_classes = 'unit', 'decade', 'hundred', 'unit', 'decade', 'hundred'
 thousands_word = ('thousand', None)
 
-xls_copy_cols = 'Subject', 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPerTarget'
-xls_cols = xls_copy_cols + ('NMissingWords', 'NMissingDigits', 'NMissingClasses')
-xls_out_cols = xls_copy_cols + ('NMissingWords', 'PMissingWords', 'NMissingDigits', 'PMissingDigits', 'NMissingClasses', 'PMissingClasses')
+xls_copy_cols = 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPerTarget'
+xls_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'NMissingDigits', 'NMissingClasses')
+xls_out_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'PMissingWords', 'NMissingDigits', 'PMissingDigits', 'NMissingClasses', 'PMissingClasses')
 
 xls_optional_cols = 'manual', 'WordOrder'
 
@@ -39,8 +41,10 @@ def parse_row(in_ws, out_ws, rownum, col_inds):
     If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
     """
 
-    for i, colname in enumerate(xls_copy_cols):
-        out_ws.cell(rownum, i+1).value = in_ws.cell(rownum, col_inds[colname]).value
+    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = u.clean_subj_id(in_ws.cell(rownum, col_inds['Subject']).value)
+
+    for colname in xls_copy_cols:
+        out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
 
     if 'manual' in col_inds and in_ws.cell(rownum, col_inds['manual']).value in (1, '1'):
 
