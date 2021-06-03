@@ -8,88 +8,124 @@ library(effects)
 library(gdata)
 library(sjPlot)
 
-scripts_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/scripts/syntactic-chunking-R'
+scripts_dir = '/Users/dror/git/syntactic-chunking/R'
 data_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/data'
 
 source(paste(scripts_dir, 'utils.R', sep='/'))
 source(paste(scripts_dir, 'sc_basic.R', sep='/'))
 
-
-#sdata1 = load_data(paste(data_dir, 'exp1/data_coded.csv', sep='/'))
-sdata1 = load_data(paste(data_dir, 'exp1/data_exp1.csv', sep='/'), nadin=TRUE, useNErrExcludingOrder = TRUE)
-sdata1_blk = sdata1[sdata1$Block != 'R',]
-sdata1_mixed = sdata1[sdata1$Block == 'R',]
+Sys.setenv("R_IS_ASSIGNING" = FALSE)
 
 #--------------------------------------------------------------------------
-# Experiment 1
+# Experiment 1 & 2
 #--------------------------------------------------------------------------
+
+sdata12 = load_data(paste(data_dir, 'exp1&2/data_coded.csv', sep='/'))
+#sdata12 = load_data(paste(data_dir, 'exp1&2/data_coded.csv', sep='/'), nadin=TRUE, useNErrExcludingOrder = TRUE)
+sdata1 = sdata12[sdata12$Block != 'R',]
+sdata2 = sdata12[sdata12$Block == 'R',]
+sdata1_all = sdata1
+sdata1_all$Condition[sdata1_all$Block == 'R'] = 'R'
+
+#-- Each data point = 1 word
+sdata1w = read.csv(paste(data_dir, 'exp1&2/data_coded_words.csv', sep='/'))
+sdata2w = sdata1w[sdata1w$block == 'R',]
+sdata1w = sdata1w[sdata1w$block != 'R',]
+
+#-- Each data point = 1 morpheme
+sdata1m = read.csv(paste(data_dir, 'exp1&2/data_coded_morphemes.csv', sep='/'))
+sdata2m = sdata1m[sdata1m$block == 'R',]
+sdata1m = sdata1m[sdata1m$block != 'R',]
+
+
+
+compare_conditions_logistic(sdata1w, 'A', 'B', 'wordOK')
+compare_conditions_morphemes(sdata1m, 'A', 'B', morpheme_type = 'digit')
+
+compare_conditions_per_subj(sdata1, 'B', 'D', 'PMissingMorphemes')
+
+compare_conditions_per_subj(sdata1m, 'B', 'D')
+compare_conditions_logistic_per_subj(sdata1, )
+
 
 #-- Compare conditions: Blocked
 
-compare_conditions(sdata1_blk, 'A', 'B', 'PMissingWords')
-compare_conditions(sdata1_blk, 'B', 'C', 'PMissingWords')
-compare_conditions(sdata1_blk, 'C', 'D', 'PMissingWords')
+compare_conditions(sdata1, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata1, 'B', 'C', 'PMissingWords')
+compare_conditions(sdata1, 'C', 'D', 'PMissingWords')
 
-compare_conditions(sdata1_blk, 'A', 'B', 'PMissingDigits')
-compare_conditions(sdata1_blk, 'B', 'C', 'PMissingDigits')
-compare_conditions(sdata1_blk, 'C', 'D', 'PMissingDigits')
+compare_conditions(sdata1, 'A', 'B', 'PMissingMorphemes')
+compare_conditions(sdata1, 'B', 'C', 'PMissingMorphemes')
+compare_conditions(sdata1, 'C', 'D', 'PMissingMorphemes')
 
-compare_conditions(sdata1_blk, 'A', 'B', 'PMissingClasses')
-compare_conditions(sdata1_blk, 'B', 'C', 'PMissingClasses')
-compare_conditions(sdata1_blk, 'C', 'D', 'PMissingClasses')
+compare_conditions(sdata1, 'A', 'B', 'PMissingDigits')
+compare_conditions(sdata1, 'B', 'C', 'PMissingDigits')
+compare_conditions(sdata1, 'C', 'D', 'PMissingDigits')
+
+compare_conditions(sdata1, 'A', 'B', 'PMissingClasses')
+compare_conditions(sdata1, 'B', 'C', 'PMissingClasses')
+compare_conditions(sdata1, 'C', 'D', 'PMissingClasses')
+
+compare_conditions_logistic_per_subj(sdata1, 'B', 'D', 'wordOK')
 
 #-- Compare conditions: Mixed
-compare_conditions(sdata1_mixed, 2, 3, 'PMissingWords')
-compare_conditions(sdata1_mixed, 3, 4, 'PMissingWords')
-compare_conditions(sdata1_mixed, 2, 4, 'PMissingWords')
+compare_conditions(sdata2, 2, 3, 'PMissingWords')
+compare_conditions(sdata2, 3, 4, 'PMissingWords')
+compare_conditions(sdata2, 2, 4, 'PMissingWords')
+condition_linear_effect(sdata2, 'PMissingWords')
 
-compare_conditions(sdata1_mixed, 2, 3, 'PMissingDigits')
-compare_conditions(sdata1_mixed, 3, 4, 'PMissingDigits')
-compare_conditions(sdata1_mixed, 2, 4, 'PMissingDigits')
+compare_conditions(sdata2, 2, 3, 'PMissingMorphemes')
+compare_conditions(sdata2, 3, 4, 'PMissingMorphemes')
+compare_conditions(sdata2, 2, 4, 'PMissingMorphemes')
+condition_linear_effect(sdata2, 'PMissingMorphemes')
 
-compare_conditions(sdata1_mixed, 2, 3, 'PMissingClasses')
-compare_conditions(sdata1_mixed, 3, 4, 'PMissingClasses')
-compare_conditions(sdata1_mixed, 2, 4, 'PMissingClasses')
+compare_conditions(sdata2, 2, 3, 'PMissingDigits')
+compare_conditions(sdata2, 3, 4, 'PMissingDigits')
+compare_conditions(sdata2, 2, 4, 'PMissingDigits')
+condition_linear_effect(sdata2, 'PMissingDigits')
+
+compare_conditions(sdata2, 2, 3, 'PMissingClasses')
+compare_conditions(sdata2, 3, 4, 'PMissingClasses')
+compare_conditions(sdata2, 2, 4, 'PMissingClasses')
+condition_linear_effect(sdata2, 'PMissingClasses')
+
+#-- Compare D vs. Mixed
+compare_conditions(sdata1_all, 'D', 'R', 'PMissingWords', item_intercept = FALSE)
 
 
 #-- Learning/attention effects? Changes during the block
-item_num_effect(sdata1_blk, 'PMissingWords')
-item_num_effect(sdata1_blk[sdata1_blk$Condition=='A',], 'PMissingWords')
-item_num_effect(sdata1_blk[sdata1_blk$Condition=='B',], 'PMissingWords')
-item_num_effect(sdata1_blk[sdata1_blk$Condition=='C',], 'PMissingWords')
-item_num_effect(sdata1_blk[sdata1_blk$Condition=='D',], 'PMissingWords')
+item_num_effect(sdata1, 'PMissingWords')
+item_num_effect(sdata1[sdata1$Condition=='A',], 'PMissingWords')
+item_num_effect(sdata1[sdata1$Condition=='B',], 'PMissingWords')
+item_num_effect(sdata1[sdata1$Condition=='C',], 'PMissingWords')
+item_num_effect(sdata1[sdata1$Condition=='D',], 'PMissingWords')
 
 # first/second half of each block
-compare_conditions(sdata1_blk[as.numeric(sdata1_blk$ItemNum) <= 10, ], 'A', 'B', 'PMissingWords')
-compare_conditions(sdata1_blk[as.numeric(sdata1_blk$ItemNum) > 10, ], 'A', 'B', 'PMissingWords')
+compare_conditions(sdata1[as.numeric(sdata1$ItemNum) <= 10, ], 'A', 'B', 'PMissingWords')
+compare_conditions(sdata1[as.numeric(sdata1$ItemNum) > 10, ], 'A', 'B', 'PMissingWords')
 
-compare_conditions(sdata1_blk[as.numeric(sdata1_blk$ItemNum) <= 10, ], 'C', 'B', 'PMissingWords')
-compare_conditions(sdata1_blk[as.numeric(sdata1_blk$ItemNum) > 10, ], 'C', 'B', 'PMissingWords')
+compare_conditions(sdata1[as.numeric(sdata1$ItemNum) <= 10, ], 'C', 'B', 'PMissingWords')
+compare_conditions(sdata1[as.numeric(sdata1$ItemNum) > 10, ], 'C', 'B', 'PMissingWords')
 
-compare_conditions(sdata1_blk[as.numeric(sdata1_blk$ItemNum) <= 10, ], 'C', 'D', 'PMissingWords')
-compare_conditions(sdata1_blk[as.numeric(sdata1_blk$ItemNum) > 10, ], 'C', 'D', 'PMissingWords')
-
-#--------------------------------------------------------------------------
-# Experiment 2
-#--------------------------------------------------------------------------
-
-sdata2 = load_data(paste(data_dir, 'exp2/data_exp2.csv', sep='/'), nadin=TRUE)
-
-compare_conditions(sdata2, 'A', 'B', 'PMissingWords')
-compare_conditions(sdata2, 'A', 'B', 'PMissingDigits')
-compare_conditions(sdata2, 'A', 'B', 'PMissingClasses')
+compare_conditions(sdata1[as.numeric(sdata1$ItemNum) <= 10, ], 'C', 'D', 'PMissingWords')
+compare_conditions(sdata1[as.numeric(sdata1$ItemNum) > 10, ], 'C', 'D', 'PMissingWords')
 
 #--------------------------------------------------------------------------
 # Experiment 3
 #--------------------------------------------------------------------------
 
-sdata3 = load_data(paste(data_dir, 'exp3/data_exp3.csv', sep='/'), nadin=TRUE)
-sdata3_item4 = sdata3[sdata3$ItemNum == 4,]
+sdata3 = load_data(paste(data_dir, 'exp3/data_exp2.csv', sep='/'), nadin=TRUE)
 
 compare_conditions(sdata3, 'A', 'B', 'PMissingWords')
 compare_conditions(sdata3, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata3, 'A', 'B', 'PMissingClasses')
 
-compare_conditions_1item(sdata3, 4, 'A', 'B', 'PMissingWords')
-compare_conditions_1item(sdata3, 4, 'A', 'B', 'PMissingDigits')
-compare_conditions_1item(sdata3, 4, 'A', 'B', 'PMissingClasses')
+#--------------------------------------------------------------------------
+# Experiment 4
+#--------------------------------------------------------------------------
+
+sdata4 = load_data(paste(data_dir, 'exp4/data_exp3.csv', sep='/'), nadin=TRUE)
+
+compare_conditions(sdata4, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata4, 'A', 'B', 'PMissingDigits')
+compare_conditions(sdata4, 'A', 'B', 'PMissingClasses')

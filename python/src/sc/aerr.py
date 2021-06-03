@@ -1,39 +1,50 @@
 
 import openpyxl
 import re
+import pandas as pd
 
 import sc.utils as u
 
 lexical_classes = 'unit', 'decade', 'hundred', 'unit', 'decade', 'hundred'
-thousands_word = ('thousand', None)
 
 xls_copy_cols = 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPerTarget'
 xls_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'NMissingDigits', 'NMissingClasses')
-xls_out_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'PMissingWords', 'NMissingDigits', 'PMissingDigits', 'NMissingClasses', 'PMissingClasses')
+xls_out_cols = ('Subject', ) + xls_copy_cols + \
+               ('NTargetDigits', 'NMissingWords', 'PMissingWords', 'NMissingDigits',
+                'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes')
 
 xls_optional_cols = 'manual', 'WordOrder'
 
 
 #------------------------------------------------------
-def analyze_errors(in_fn, out_fn):
+def analyze_errors(in_fn, out_dir, consider_thousand_as_digit):
 
     in_ws, col_inds = _open_input_file(in_fn)
     out_wb, out_ws = create_output_workbook()
 
+    result_per_word = dict(subject=[], block=[], condition=[], itemNum=[], target=[], response=[], nTargetWords=[],
+                           wordOK=[], digitOK=[], classOK=[])
+
+    result_per_morpheme = dict(subject=[], block=[], condition=[], itemNum=[], target=[], response=[],
+                               nTargetWords=[], nTargetDigits=[], nTargetMorphemes=[],
+                               morpheme_type=[], correct=[])
+
     ok = True
     for rownum in range(2, in_ws.max_row+1):
-        ok = parse_row(in_ws, out_ws, rownum, col_inds) and ok
+        ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit) and ok
 
     if not ok:
         print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
 
     out_ws.freeze_panes = out_ws['A2']
     auto_col_width(out_ws)
-    out_wb.save(out_fn)
+    out_wb.save(out_dir + '/data_coded.xlsx')
+    pd.DataFrame(result_per_word).to_csv(out_dir + '/data_coded_words.csv', index=False)
+    pd.DataFrame(result_per_morpheme).to_csv(out_dir + '/data_coded_morphemes.csv', index=False)
 
 
 #------------------------------------------------------
-def parse_row(in_ws, out_ws, rownum, col_inds):
+def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit):
     """
     Parse a single row, copy it to the output file
     Return True if processed OK.
@@ -46,6 +57,19 @@ def parse_row(in_ws, out_ws, rownum, col_inds):
     for colname in xls_copy_cols:
         out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
 
+    n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
+
+    target_segments = parse_target(in_ws.cell(rownum, col_inds['target']).value, rownum)
+    target = collapse_segments(target_segments)
+    assert n_target_words == len(target)
+
+    if consider_thousand_as_digit:
+        target_digits = [t[1] for t in target]
+    else:
+        target_digits = [t[1] for t in target if t[0] != 'thousand']
+
+    n_target_digits = len(target_digits)
+
     if 'manual' in col_inds and in_ws.cell(rownum, col_inds['manual']).value in (1, '1'):
 
         n_word_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingWords']).value)
@@ -57,46 +81,95 @@ def parse_row(in_ws, out_ws, rownum, col_inds):
 
     else:
 
-        target_segments = parse_target(in_ws.cell(rownum, col_inds['target']).value, rownum)
         response_segments = parse_response(in_ws.cell(rownum, col_inds['response']).value, rownum, target_segments)
         if target_segments is None or response_segments is None:
             return False
 
-        target = collapse_segments(target_segments)
         response = collapse_segments(response_segments)
 
         n_word_errs = n_missing_target_items(target, response)
-        n_digit_errs = n_missing_target_items([t[1] for t in target], [r[1] for r in response])
         n_class_errs = _n_missing_classes(target, response)
 
-    out_ws.cell(rownum, 1 + xls_out_cols.index('NMissingWords')).value = n_word_errs
-    out_ws.cell(rownum, 1 + xls_out_cols.index('NMissingDigits')).value = n_digit_errs
-    out_ws.cell(rownum, 1 + xls_out_cols.index('NMissingClasses')).value = n_class_errs
+        if consider_thousand_as_digit:
+            response_digits = [r[1] for r in response]
+        else:
+            response_digits = [r[1] for r in response if r[0] != 'thousand']
 
-    n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
-    out_ws.cell(rownum, 1 + xls_out_cols.index('PMissingWords')).value = n_word_errs / n_target_words
-    out_ws.cell(rownum, 1 + xls_out_cols.index('PMissingDigits')).value = n_digit_errs / n_target_words
-    out_ws.cell(rownum, 1 + xls_out_cols.index('PMissingClasses')).value = n_class_errs / n_target_words
+        n_digit_errs = n_missing_target_items(target_digits, response_digits)
+
+    _save_value(out_ws, rownum, 'NTargetDigits', n_target_digits)
+    _save_value(out_ws, rownum, 'NMissingWords', n_word_errs)
+    _save_value(out_ws, rownum, 'NMissingDigits', n_digit_errs)
+    _save_value(out_ws, rownum, 'NMissingClasses', n_class_errs)
+    _save_value(out_ws, rownum, 'PMissingWords', n_word_errs / n_target_words)
+    _save_value(out_ws, rownum, 'PMissingDigits', n_digit_errs / n_target_digits)
+    _save_value(out_ws, rownum, 'PMissingClasses', n_class_errs / n_target_words)
+    _save_value(out_ws, rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
+
+    for i in range(n_target_words):
+        result_per_word['subject'].append(in_ws.cell(rownum, col_inds['Subject']).value)
+        result_per_word['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
+        result_per_word['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
+        result_per_word['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
+        result_per_word['target'].append(in_ws.cell(rownum, col_inds['target']).value)
+        result_per_word['response'].append(in_ws.cell(rownum, col_inds['response']).value)
+        result_per_word['nTargetWords'].append(n_target_words)
+        result_per_word['wordOK'].append(1 if i >= n_word_errs else 0)
+        result_per_word['digitOK'].append(1 if i >= n_digit_errs else 0)
+        result_per_word['classOK'].append(1 if i >= n_class_errs else 0)
+
+        result_per_morpheme['subject'].append(in_ws.cell(rownum, col_inds['Subject']).value)
+        result_per_morpheme['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
+        result_per_morpheme['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
+        result_per_morpheme['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
+        result_per_morpheme['target'].append(in_ws.cell(rownum, col_inds['target']).value)
+        result_per_morpheme['response'].append(in_ws.cell(rownum, col_inds['response']).value)
+        result_per_morpheme['nTargetWords'].append(n_target_words)
+        result_per_morpheme['nTargetDigits'].append(n_target_digits)
+        result_per_morpheme['nTargetMorphemes'].append(n_target_words + n_target_digits)
+        result_per_morpheme['morpheme_type'].append('class')
+        result_per_morpheme['correct'].append(1 if i >= n_class_errs else 0)
+
+    for i in range(n_target_digits):
+        result_per_morpheme['subject'].append(in_ws.cell(rownum, col_inds['Subject']).value)
+        result_per_morpheme['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
+        result_per_morpheme['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
+        result_per_morpheme['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
+        result_per_morpheme['target'].append(in_ws.cell(rownum, col_inds['target']).value)
+        result_per_morpheme['response'].append(in_ws.cell(rownum, col_inds['response']).value)
+        result_per_morpheme['nTargetWords'].append(n_target_words)
+        result_per_morpheme['nTargetDigits'].append(n_target_digits)
+        result_per_morpheme['nTargetMorphemes'].append(n_target_words + n_target_digits)
+        result_per_morpheme['morpheme_type'].append('digit')
+        result_per_morpheme['correct'].append(1 if i >= n_digit_errs else 0)
 
     return True
 
 
+#------------------------
 def _nullto0(v):
     if v is None or v == '':
         return 0
     else:
         return v
 
+
+#------------------------------------------------------
+def _save_value(out_ws, rownum, colname, value):
+    out_ws.cell(rownum, 1 + xls_out_cols.index(colname)).value = value
+
+
 #------------------------------------------------------
 def _n_missing_classes(target, response):
-    target = [t if t == 'thousand' else t[0] for t in target]
-    response = [r if r == 'thousand' else r[0] for r in response]
+    target = [t[0] for t in target]
+    response = [r[0] for r in response]
 
     for r in response:
         if r in target:
             target.remove(r)
 
     return len(target)
+
 
 #------------------------------------------------------
 def n_missing_target_items(target_items, response_items):
@@ -154,7 +227,6 @@ def parse_target(target, rownum):
 
     :param target:
     :param rownum:
-    :return:
     """
 
     if isinstance(target, float):
@@ -166,55 +238,82 @@ def parse_target(target, rownum):
 
     parsed_segments = []
     for seg in segments:
-        m = re.match('^([0-9,]+)\\s*t\\s*([0-9,]+)?$', seg)
+        m = re.match('^([0-9,]*)\\s*t\\s*([0-9,]+)?$', seg)
+
         if m is None:
-            parsed_segment = parse_segment_into_word_list(seg),
+            parsed_segment = [ parse_segment_into_word_list(seg) ]
         else:
-            parsed_segment = [parse_segment_into_word_list(m.group(1)), parse_segment_into_word_list('t')]
+            parsed_segment = _parse_pre_thousand_segment(m, seg)
             if m.group(2) is not None:
-                parsed_segments.append(parse_segment_into_word_list(m.group(2)))
+                parsed_segment.append(parse_segment_into_word_list(m.group(2)))
 
         if None in parsed_segment:  # invalid format
             print('WARNING: unsupported target/response format: "{}" -- line {} ignored'.format(target, rownum))
             return None
 
-        parsed_segments.append([e for seg in parsed_segment for e in seg])
+        #-- combine parts of the parsed segment
+        parsed_segment = [e for seg in parsed_segment for e in seg]
+
+        parsed_segments.append(parsed_segment)
 
     return parsed_segments
 
 
 #------------------------------------------------------
-def parse_segment_into_word_list(n):
+def _parse_pre_thousand_segment(matcher, segment):
+    """ Parse the 'thousand' and the preceding digits """
+
+    if len(matcher.group(1)) == 0:
+        # -- The word "thousand" with no preceding digit
+        return [ parse_segment_into_word_list('t') ]
+
+    elif len(matcher.group(1)) == 1:
+        # -- A 4-digit number: the "thousand" is combined with the preceding digit
+        return [ parse_segment_into_word_list(matcher.group(1) + '000') ]
+
+    elif len(matcher.group(1)) in (2, 3):
+        # -- A 5- or 6-digit number: the "thousand" is a separate word
+        return [parse_segment_into_word_list(matcher.group(1)), parse_segment_into_word_list('t')]
+
+    else:
+        raise Exception('Unsupported format: {}'.format(segment))
+
+
+#------------------------------------------------------
+def parse_segment_into_word_list(segment):
     """
     Parse a number into a series of words
     """
 
-    if n == 't' or n == '1000':
-        return ['thousand']
+    if segment == 't' or segment == '1000':
+        return [('thousand', 1)]
 
-    if n == '+':
+    if segment == '+':
         return ['correct']
 
-    if n == '-':
+    if segment == '-':
         return []
 
-    n = n.replace(',', '')  # delete commas
+    segment = segment.replace(',', '')  # delete commas
 
-    if re.match('^\\d+$', n) is None:
+    if re.match('^\\d+$', segment) is None:
         return None
 
-    ndigits = len(n)
+    ndigits = len(segment)
 
     result = []
     for i in range(0, ndigits):
-        digit = int(n[-(i+1)])
+        digit = int(segment[-(i+1)])
         if ndigits == 4 and i == 3:
-            if digit == 1:
-                result.append('thousand')
-            else:
-                result.append(('thousand', digit))
+            result.append(('thousand', digit))
+
         elif digit != 0:
             result.append((lexical_classes[i], digit))
+
+        if i == 2 and ndigits > 4:
+            # todo the following works for this experiment, but may not work for others:
+            #      the word "thousand" in 5/6-digit numbers may count as a digit error versus numbers like 31
+            result.append(('thousand', 1))
 
     return result[::-1]
 
@@ -253,6 +352,7 @@ def create_output_workbook():
         ws.cell(1, i_col+1).value = colname
 
     return wb, ws
+
 
 #------------------------------------------------------
 def auto_col_width(ws):
