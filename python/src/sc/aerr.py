@@ -52,14 +52,20 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
     If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
     """
 
-    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = u.clean_subj_id(in_ws.cell(rownum, col_inds['Subject']).value)
+    subj_id = in_ws.cell(rownum, col_inds['Subject']).value
+    target_str = in_ws.cell(rownum, col_inds['target']).value
+    if subj_id is None and target_str is None:
+        print('Warning: row #{} seems empty, ignored'.format(rownum))
+        return True
+
+    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = u.clean_subj_id(subj_id)
 
     for colname in xls_copy_cols:
         out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
 
     n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
 
-    target_segments = parse_target(in_ws.cell(rownum, col_inds['target']).value, rownum)
+    target_segments = parse_target_or_response(target_str, rownum)
     target = collapse_segments(target_segments)
     assert n_target_words == len(target)
 
@@ -107,22 +113,22 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
     _save_value(out_ws, rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
 
     for i in range(n_target_words):
-        result_per_word['subject'].append(in_ws.cell(rownum, col_inds['Subject']).value)
+        result_per_word['subject'].append(subj_id)
         result_per_word['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
         result_per_word['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
         result_per_word['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
-        result_per_word['target'].append(in_ws.cell(rownum, col_inds['target']).value)
+        result_per_word['target'].append(target_str)
         result_per_word['response'].append(in_ws.cell(rownum, col_inds['response']).value)
         result_per_word['nTargetWords'].append(n_target_words)
         result_per_word['wordOK'].append(1 if i >= n_word_errs else 0)
         result_per_word['digitOK'].append(1 if i >= n_digit_errs else 0)
         result_per_word['classOK'].append(1 if i >= n_class_errs else 0)
 
-        result_per_morpheme['subject'].append(in_ws.cell(rownum, col_inds['Subject']).value)
+        result_per_morpheme['subject'].append(subj_id)
         result_per_morpheme['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
         result_per_morpheme['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
         result_per_morpheme['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
-        result_per_morpheme['target'].append(in_ws.cell(rownum, col_inds['target']).value)
+        result_per_morpheme['target'].append(target_str)
         result_per_morpheme['response'].append(in_ws.cell(rownum, col_inds['response']).value)
         result_per_morpheme['nTargetWords'].append(n_target_words)
         result_per_morpheme['nTargetDigits'].append(n_target_digits)
@@ -131,11 +137,11 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
         result_per_morpheme['correct'].append(1 if i >= n_class_errs else 0)
 
     for i in range(n_target_digits):
-        result_per_morpheme['subject'].append(in_ws.cell(rownum, col_inds['Subject']).value)
+        result_per_morpheme['subject'].append(subj_id)
         result_per_morpheme['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
         result_per_morpheme['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
         result_per_morpheme['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
-        result_per_morpheme['target'].append(in_ws.cell(rownum, col_inds['target']).value)
+        result_per_morpheme['target'].append(target_str)
         result_per_morpheme['response'].append(in_ws.cell(rownum, col_inds['response']).value)
         result_per_morpheme['nTargetWords'].append(n_target_words)
         result_per_morpheme['nTargetDigits'].append(n_target_digits)
@@ -186,15 +192,20 @@ def n_missing_target_items(target_items, response_items):
 #------------------------------------------------------
 def parse_response(response_str, rownum, target_segments):
 
+    if response_str is None:
+        return None
+
     if response_str == '+':
         return target_segments
 
     if response_str == '-':
         return []
 
-    response_segments = parse_target(response_str, rownum)
+    response_segments = parse_target_or_response(response_str, rownum)
     if response_segments is None:
         return None
+
+    target_has_duplicate_segments = len(target_segments) != len(set(target_segments))
 
     #-- swap "+" with the corresponding target value
     for i, r in enumerate(response_segments):
@@ -204,8 +215,8 @@ def parse_response(response_str, rownum, target_segments):
                       'Line {} ignored'.format(rownum))
                 return None
 
-            #-- double validation -- in case we have order mismatch
-            if target_segments[i] in response_segments:
+            #-- double validation -- in case we have order mismatch. Validate this only if the tar
+            if not target_has_duplicate_segments and target_segments[i] in response_segments:
                 print('WARNING: "+" is ambiguous because the target and response have different order of segments. ' +
                       'Line {} ignored'.format(rownum))
                 return None
@@ -221,20 +232,20 @@ def collapse_segments(parsed_segments):
 
 
 #------------------------------------------------------
-def parse_target(target, rownum):
+def parse_target_or_response(raw_text, rownum):
     """
     Return a list of segments, each of which is a list of words
 
-    :param target:
+    :param raw_text:
     :param rownum:
     """
 
-    if isinstance(target, float):
-        target = "{:.0f}".format(target)
-    elif isinstance(target, int):
-        target = "{:}".format(target)
+    if isinstance(raw_text, float):
+        raw_text = "{:.0f}".format(raw_text)
+    elif isinstance(raw_text, int):
+        raw_text = "{:}".format(raw_text)
 
-    segments = [e.strip() for e in target.split('/')]
+    segments = [e.strip() for e in raw_text.split('/')]
 
     parsed_segments = []
     for seg in segments:
@@ -248,13 +259,13 @@ def parse_target(target, rownum):
                 parsed_segment.append(parse_segment_into_word_list(m.group(2)))
 
         if None in parsed_segment:  # invalid format
-            print('WARNING: unsupported target/response format: "{}" -- line {} ignored'.format(target, rownum))
+            print('WARNING: unsupported target/response format: "{}" -- line {} ignored'.format(raw_text, rownum))
             return None
 
         #-- combine parts of the parsed segment
         parsed_segment = [e for seg in parsed_segment for e in seg]
 
-        parsed_segments.append(parsed_segment)
+        parsed_segments.append(tuple(parsed_segment))
 
     return parsed_segments
 
