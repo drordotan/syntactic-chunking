@@ -3,8 +3,6 @@ import openpyxl
 import re
 import pandas as pd
 
-import sc.utils as u
-
 lexical_classes = 'unit', 'decade', 'hundred', 'unit', 'decade', 'hundred'
 
 xls_copy_cols = 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPerTarget'
@@ -17,7 +15,7 @@ xls_optional_cols = 'manual', 'WordOrder'
 
 
 #------------------------------------------------------
-def analyze_errors(in_fn, out_dir, consider_thousand_as_digit):
+def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, subj_id_parser=None):
 
     in_ws, col_inds = _open_input_file(in_fn)
     out_wb, out_ws = create_output_workbook()
@@ -31,7 +29,8 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit):
 
     ok = True
     for rownum in range(2, in_ws.max_row+1):
-        ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit) and ok
+        ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word,
+                       result_per_morpheme, consider_thousand_as_digit, use_teens, subj_id_parser) and ok
 
     if not ok:
         print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
@@ -44,12 +43,13 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit):
 
 
 #------------------------------------------------------
-def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit):
+def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit, use_teens,
+              subj_id_parser):
     """
     Parse a single row, copy it to the output file
     Return True if processed OK.
 
-    If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
+    # If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
     """
 
     subj_id = in_ws.cell(rownum, col_inds['Subject']).value
@@ -58,16 +58,18 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
         print('Warning: row #{} seems empty, ignored'.format(rownum))
         return True
 
-    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = u.clean_subj_id(subj_id)
+    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = subj_id if subj_id_parser is None else subj_id_parser(subj_id)
 
     for colname in xls_copy_cols:
         out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
 
     n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
 
-    target_segments = parse_target_or_response(target_str, rownum)
+    target_segments = parse_target_or_response(target_str, rownum, use_teens)
     target = collapse_segments(target_segments)
-    assert n_target_words == len(target)
+    if n_target_words != len(target):
+        print("Error in line {}: Invalid number of words ({}), expecting {} words".format(rownum, len(target), n_target_words))
+        return False
 
     if consider_thousand_as_digit:
         target_digits = [t[1] for t in target]
@@ -87,7 +89,7 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
 
     else:
 
-        response_segments = parse_response(in_ws.cell(rownum, col_inds['response']).value, rownum, target_segments)
+        response_segments = parse_response(in_ws.cell(rownum, col_inds['response']).value, rownum, target_segments, use_teens)
         if target_segments is None or response_segments is None:
             return False
 
@@ -190,31 +192,43 @@ def n_missing_target_items(target_items, response_items):
 
 
 #------------------------------------------------------
-def parse_response(response_str, rownum, target_segments):
+def parse_response(response_str, rownum, target_segments, use_teens):
 
     if response_str is None:
         return None
 
-    if response_str == '+':
+    if response_str in ('+', '!'):
         return target_segments
 
     if response_str == '-':
         return []
 
-    response_segments = parse_target_or_response(response_str, rownum)
+    response_str = str(response_str)
+
+    #-- Check if there are optional things
+    m = re.match('(.*);(.+)', response_str)
+    if m is None:
+        response_segments_unknown_loc = []
+    else:
+        response_str = m.group(1)
+        response_segments_unknown_loc = parse_target_or_response(m.group(2), rownum, use_teens)
+        if response_segments_unknown_loc is None:
+            return None
+
+    response_segments = parse_target_or_response(response_str, rownum, use_teens)
     if response_segments is None:
         return None
 
     target_has_duplicate_segments = len(target_segments) != len(set(target_segments))
 
+    if len(response_segments) != len(target_segments) and ['correct'] in response_segments:
+        print('WARNING: "+" is ambiguous because the target and response have different number of segments. '+
+              'Line {} ignored'.format(rownum))
+        return None
+
     #-- swap "+" with the corresponding target value
     for i, r in enumerate(response_segments):
         if r == ['correct']:
-            if len(response_segments) != len(target_segments):
-                print('WARNING: "+" is ambiguous because the target and response have different number of segments. ' +
-                      'Line {} ignored'.format(rownum))
-                return None
-
             #-- double validation -- in case we have order mismatch. Validate this only if the tar
             if not target_has_duplicate_segments and target_segments[i] in response_segments:
                 print('WARNING: "+" is ambiguous because the target and response have different order of segments. ' +
@@ -223,7 +237,7 @@ def parse_response(response_str, rownum, target_segments):
 
             response_segments[i] = target_segments[i]
 
-    return response_segments
+    return response_segments + response_segments_unknown_loc
 
 
 #------------------------------------------------------
@@ -232,7 +246,7 @@ def collapse_segments(parsed_segments):
 
 
 #------------------------------------------------------
-def parse_target_or_response(raw_text, rownum):
+def parse_target_or_response(raw_text, rownum, use_teens):
     """
     Return a list of segments, each of which is a list of words
 
@@ -252,11 +266,11 @@ def parse_target_or_response(raw_text, rownum):
         m = re.match('^([0-9,]*)\\s*t\\s*([0-9,]+)?$', seg)
 
         if m is None:
-            parsed_segment = [ parse_segment_into_word_list(seg) ]
+            parsed_segment = [ parse_segment_into_word_list(seg, use_teens) ]
         else:
-            parsed_segment = _parse_pre_thousand_segment(m, seg)
+            parsed_segment = _parse_pre_thousand_segment(m, seg, use_teens)
             if m.group(2) is not None:
-                parsed_segment.append(parse_segment_into_word_list(m.group(2)))
+                parsed_segment.append(parse_segment_into_word_list(m.group(2), use_teens))
 
         if None in parsed_segment:  # invalid format
             print('WARNING: unsupported target/response format: "{}" -- line {} ignored'.format(raw_text, rownum))
@@ -271,27 +285,27 @@ def parse_target_or_response(raw_text, rownum):
 
 
 #------------------------------------------------------
-def _parse_pre_thousand_segment(matcher, segment):
+def _parse_pre_thousand_segment(matcher, segment, use_teens):
     """ Parse the 'thousand' and the preceding digits """
 
     if len(matcher.group(1)) == 0:
         # -- The word "thousand" with no preceding digit
-        return [ parse_segment_into_word_list('t') ]
+        return [ parse_segment_into_word_list('t', use_teens) ]
 
     elif len(matcher.group(1)) == 1:
         # -- A 4-digit number: the "thousand" is combined with the preceding digit
-        return [ parse_segment_into_word_list(matcher.group(1) + '000') ]
+        return [ parse_segment_into_word_list(matcher.group(1) + '000', False) ]
 
     elif len(matcher.group(1)) in (2, 3):
         # -- A 5- or 6-digit number: the "thousand" is a separate word
-        return [parse_segment_into_word_list(matcher.group(1)), parse_segment_into_word_list('t')]
+        return [parse_segment_into_word_list(matcher.group(1), use_teens), parse_segment_into_word_list('t', False)]
 
     else:
         raise Exception('Unsupported format: {}'.format(segment))
 
 
 #------------------------------------------------------
-def parse_segment_into_word_list(segment):
+def parse_segment_into_word_list(segment, use_teens):
     """
     Parse a number into a series of words
     """
@@ -299,7 +313,7 @@ def parse_segment_into_word_list(segment):
     if segment == 't' or segment == '1000':
         return [('thousand', 1)]
 
-    if segment == '+':
+    if segment in ('+', '!'):
         return ['correct']
 
     if segment == '-':
@@ -310,13 +324,19 @@ def parse_segment_into_word_list(segment):
     if re.match('^\\d+$', segment) is None:
         return None
 
+    digits = [int(d) for d in segment[::-1]]
     ndigits = len(segment)
+    if use_teens and ndigits > 1 and digits[1] == 1 and digits[0] != 0:
+        digits[1] = 0
+        digits[0] += 10
 
     result = []
-    for i in range(0, ndigits):
-        digit = int(segment[-(i+1)])
+    for i, digit in enumerate(digits):
         if ndigits == 4 and i == 3:
             result.append(('thousand', digit))
+
+        elif i == 0 and digit > 10:
+            result.append(('teens', digit-10))
 
         elif digit != 0:
             result.append((lexical_classes[i], digit))
