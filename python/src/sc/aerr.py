@@ -15,7 +15,16 @@ xls_optional_cols = 'manual', 'WordOrder'
 
 
 #------------------------------------------------------
-def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, subj_id_parser=None):
+def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, subj_id_transformer=None, per_word=False):
+    """
+    Analyze the overall error rates (digit, class,word) in each trial
+
+    :param in_fn: Excel file with the raw data (uncoded)
+    :param out_dir: Directory for output file
+    :param consider_thousand_as_digit:  Whether the word "thousand" should count towards digit errors
+    :param use_teens: Consider teens as a separate class
+    :param subj_id_transformer: Function for transfoming the subject ID field
+    """
 
     in_ws, col_inds = _open_input_file(in_fn)
     out_wb, out_ws = create_output_workbook()
@@ -23,14 +32,14 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, 
     result_per_word = dict(subject=[], block=[], condition=[], itemNum=[], target=[], response=[], nTargetWords=[],
                            wordOK=[], digitOK=[], classOK=[])
 
-    result_per_morpheme = dict(subject=[], block=[], condition=[], itemNum=[], target=[], response=[],
-                               nTargetWords=[], nTargetDigits=[], nTargetMorphemes=[],
+    result_per_morpheme = dict(subject=[], block=[], condition=[], itemNum=[], segment_num=[], target=[], response=[],
+                               target_segment=[], nTargetWords=[], nTargetDigits=[], nTargetMorphemes=[],
                                morpheme_type=[], correct=[])
 
     ok = True
     for rownum in range(2, in_ws.max_row+1):
         ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word,
-                       result_per_morpheme, consider_thousand_as_digit, use_teens, subj_id_parser) and ok
+                       result_per_morpheme, consider_thousand_as_digit, use_teens, subj_id_transformer, per_word) and ok
 
     if not ok:
         print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
@@ -44,28 +53,33 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, 
 
 #------------------------------------------------------
 def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit, use_teens,
-              subj_id_parser):
+              subj_id_transformer, per_word):
     """
     Parse a single row, copy it to the output file
     Return True if processed OK.
 
-    # If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
+    If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
     """
 
     subj_id = in_ws.cell(rownum, col_inds['Subject']).value
-    target_str = in_ws.cell(rownum, col_inds['target']).value
-    if subj_id is None and target_str is None:
+    block = in_ws.cell(rownum, col_inds['Block']).value
+    cond_name = in_ws.cell(rownum, col_inds['Condition']).value
+    item_num = in_ws.cell(rownum, col_inds['ItemNum']).value
+    raw_target = in_ws.cell(rownum, col_inds['target']).value
+    raw_response = in_ws.cell(rownum, col_inds['response']).value
+    n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
+    manual_coding = 'manual' in col_inds and in_ws.cell(rownum, col_inds['manual']).value in (1, '1')
+
+    if subj_id is None and raw_target is None:
         print('Warning: row #{} seems empty, ignored'.format(rownum))
         return True
 
-    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = subj_id if subj_id_parser is None else subj_id_parser(subj_id)
+    out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = subj_id if subj_id_transformer is None else subj_id_transformer(subj_id)
 
     for colname in xls_copy_cols:
         out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
 
-    n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
-
-    target_segments = parse_target_or_response(target_str, rownum, use_teens)
+    target_segments = parse_target_or_response(raw_target, rownum, use_teens)
     target = collapse_segments(target_segments)
     if n_target_words != len(target):
         print("Error in line {}: Invalid number of words ({}), expecting {} words".format(rownum, len(target), n_target_words))
@@ -76,9 +90,11 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
     else:
         target_digits = [t[1] for t in target if t[0] != 'thousand']
 
+    target_digits = target_digits[::-1]  # put the unit digit in position 1
+
     n_target_digits = len(target_digits)
 
-    if 'manual' in col_inds and in_ws.cell(rownum, col_inds['manual']).value in (1, '1'):
+    if manual_coding:
 
         n_word_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingWords']).value)
         if 'WordOrder' in col_inds:
@@ -86,10 +102,11 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
 
         n_digit_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingDigits']).value)
         n_class_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingClasses']).value)
+        response_digits = ()
 
     else:
 
-        response_segments = parse_response(in_ws.cell(rownum, col_inds['response']).value, rownum, target_segments, use_teens)
+        response_segments = parse_response(raw_response, rownum, target_segments, use_teens)
         if target_segments is None or response_segments is None:
             return False
 
@@ -114,24 +131,30 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
     _save_value(out_ws, rownum, 'PMissingClasses', n_class_errs / n_target_words)
     _save_value(out_ws, rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
 
+    if manual_coding and per_word:
+        print('WARNING: line {} excluded from the per-word analyses because it was coded manually'.format(rownum))
+        return True
+
     for i in range(n_target_words):
         result_per_word['subject'].append(subj_id)
-        result_per_word['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
-        result_per_word['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
-        result_per_word['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
-        result_per_word['target'].append(target_str)
-        result_per_word['response'].append(in_ws.cell(rownum, col_inds['response']).value)
+        result_per_word['block'].append(block)
+        result_per_word['condition'].append(cond_name)
+        result_per_word['itemNum'].append(item_num)
+        result_per_word['target'].append(raw_target)
+        result_per_word['response'].append(raw_response)
         result_per_word['nTargetWords'].append(n_target_words)
         result_per_word['wordOK'].append(1 if i >= n_word_errs else 0)
         result_per_word['digitOK'].append(1 if i >= n_digit_errs else 0)
         result_per_word['classOK'].append(1 if i >= n_class_errs else 0)
 
         result_per_morpheme['subject'].append(subj_id)
-        result_per_morpheme['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
-        result_per_morpheme['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
-        result_per_morpheme['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
-        result_per_morpheme['target'].append(target_str)
-        result_per_morpheme['response'].append(in_ws.cell(rownum, col_inds['response']).value)
+        result_per_morpheme['block'].append(block)
+        result_per_morpheme['condition'].append(cond_name)
+        result_per_morpheme['itemNum'].append(item_num)
+        result_per_morpheme['segment_num'].append('')
+        result_per_morpheme['target'].append(raw_target)
+        result_per_morpheme['target_segment'].append('')
+        result_per_morpheme['response'].append(raw_response)
         result_per_morpheme['nTargetWords'].append(n_target_words)
         result_per_morpheme['nTargetDigits'].append(n_target_digits)
         result_per_morpheme['nTargetMorphemes'].append(n_target_words + n_target_digits)
@@ -140,16 +163,24 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
 
     for i in range(n_target_digits):
         result_per_morpheme['subject'].append(subj_id)
-        result_per_morpheme['block'].append(in_ws.cell(rownum, col_inds['Block']).value)
-        result_per_morpheme['condition'].append(in_ws.cell(rownum, col_inds['Condition']).value)
-        result_per_morpheme['itemNum'].append(in_ws.cell(rownum, col_inds['ItemNum']).value)
-        result_per_morpheme['target'].append(target_str)
-        result_per_morpheme['response'].append(in_ws.cell(rownum, col_inds['response']).value)
+        result_per_morpheme['block'].append(block)
+        result_per_morpheme['condition'].append(cond_name)
+        result_per_morpheme['itemNum'].append(item_num)
+        result_per_morpheme['segment_num'].append(i+1 if per_word else '')
+        result_per_morpheme['target'].append(raw_target)
+        result_per_morpheme['target_segment'].append(target_digits[i] if per_word else '')
+        result_per_morpheme['response'].append(raw_response)
         result_per_morpheme['nTargetWords'].append(n_target_words)
         result_per_morpheme['nTargetDigits'].append(n_target_digits)
         result_per_morpheme['nTargetMorphemes'].append(n_target_words + n_target_digits)
         result_per_morpheme['morpheme_type'].append('digit')
-        result_per_morpheme['correct'].append(1 if i >= n_digit_errs else 0)
+
+        if per_word:
+            correct = target_digits[i] in response_digits
+        else:
+            correct = 1 if i >= n_digit_errs else 0
+
+        result_per_morpheme['correct'].append(correct)
 
     return True
 
@@ -228,7 +259,9 @@ def parse_response(response_str, rownum, target_segments, use_teens):
 
     #-- swap "+" with the corresponding target value
     for i, r in enumerate(response_segments):
-        if r == ['correct']:
+        if i >= len(target_segments):
+            break
+        if list(r) == ['correct']:
             #-- double validation -- in case we have order mismatch. Validate this only if the tar
             if not target_has_duplicate_segments and target_segments[i] in response_segments:
                 print('WARNING: "+" is ambiguous because the target and response have different order of segments. ' +
@@ -352,7 +385,13 @@ def parse_segment_into_word_list(segment, use_teens):
 #------------------------------------------------------
 def _open_input_file(filename):
     wb = openpyxl.load_workbook(filename)
-    ws = wb.get_sheet_by_name('data')
+    if len(wb.worksheets) == 1:
+        ws = wb.worksheets[0]
+    else:
+        sheet_names = [s.title for s in wb.worksheets]
+        if 'data' not in sheet_names:
+            raise Exception('{} does not contain any worksheet named "data"'.format(filename))
+        ws = wb.get_sheet_by_name('data')
 
     col_inds = _xls_structure(ws)
 
