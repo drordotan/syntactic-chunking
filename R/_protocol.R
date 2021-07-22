@@ -68,6 +68,17 @@ compare_conditions(sdata1, 'C', 'D', 'PMissingClasses')
 
 compare_conditions_logistic_per_subj(sdata1, 'B', 'D', 'wordOK')
 
+#-- Compare 5-digit and 6-digit separately
+cat(sprintf('\nAnalysis of 6-digit numbers (%d subjects):\n', length(unique(sdata1$Subject[sdata1$NWordsPerTarget == 7]))))
+compare_conditions(sdata1[sdata1$NWordsPerTarget == 7,], 'A', 'B', 'PMissingMorphemes')
+compare_conditions(sdata1[sdata1$NWordsPerTarget == 7,], 'B', 'C', 'PMissingMorphemes')
+compare_conditions(sdata1[sdata1$NWordsPerTarget == 7,], 'C', 'D', 'PMissingMorphemes')
+
+cat('\nAnalysis of 5-digit numbers:\n')
+compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'A', 'B', 'PMissingMorphemes')
+compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'B', 'C', 'PMissingMorphemes')
+compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'C', 'D', 'PMissingMorphemes')
+
 #-- Compare conditions: Mixed
 compare_conditions(sdata2, 2, 3, 'PMissingWords')
 compare_conditions(sdata2, 3, 4, 'PMissingWords')
@@ -114,9 +125,9 @@ compare_conditions(sdata1[as.numeric(sdata1$ItemNum) > 10, ], 'C', 'D', 'PMissin
 # Experiment 3
 #--------------------------------------------------------------------------
 
-sdata3 = load_data(paste(data_dir, 'exp3/data_exp2.csv', sep='/'), nadin=TRUE)
+sdata3 = load_data(paste(data_dir, 'exp3/data_coded.csv', sep='/'), nadin=TRUE)
 
-compare_conditions(sdata3, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata3, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata3, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata3, 'A', 'B', 'PMissingClasses')
 
@@ -124,7 +135,7 @@ compare_conditions(sdata3, 'A', 'B', 'PMissingClasses')
 # Experiment 4
 #--------------------------------------------------------------------------
 
-sdata4 = load_data(paste(data_dir, 'exp4/data_exp3.csv', sep='/'), nadin=TRUE)
+sdata4 = load_data(paste(data_dir, 'exp4/data_coded.csv', sep='/'), nadin=TRUE)
 
 compare_conditions(sdata4, 'A', 'B', 'PMissingWords')
 compare_conditions(sdata4, 'A', 'B', 'PMissingDigits')

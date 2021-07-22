@@ -1,8 +1,6 @@
 
 import numpy as np
 from collections import namedtuple
-from operator import attrgetter
-import scipy.stats
 
 
 TTestResult = namedtuple('TTestResult', ['subj', 't', 'p'])
@@ -32,44 +30,21 @@ def subj_pattern(subj_df, conditions, dependent_var):
 
 
 #---------------------------------------------------------------------------
-def compare_conds_per_subject(df, cond1, cond2, dependent_var, alpha=0.05):
+def compare_conds_per_item(df, cond1, cond2, dependent_var):
 
-    subj_ids = sorted(set(df.Subject.unique()))
+    cond1_results = _get_success_per_item(df[df.Condition == cond1], dependent_var)
+    cond2_results = _get_success_per_item(df[df.Condition == cond2], dependent_var)
 
-    ttest_results = []
+    keys = set(cond1_results.keys()).intersection(set(cond2_results.keys()))
+    n_cond1_gt_cond2 = sum([cond1_results[k] > cond2_results[k] for k in keys])
+    n_cond1_eq_cond2 = sum([cond1_results[k] == cond2_results[k] for k in keys])
+    n_cond2_gt_cond1 = len(keys) - n_cond1_eq_cond2 - n_cond1_gt_cond2
+    print('Comparing {} between condition {} and {}:'.format(dependent_var, cond1, cond2))
+    print('   Higher in {}: {}/{} ({:.1f}%) items'.format(cond1, n_cond1_gt_cond2, len(keys), n_cond1_gt_cond2 / len(keys) * 100))
+    print('   Higher in {}: {}/{} ({:.1f}%) items'.format(cond2, n_cond2_gt_cond1, len(keys), n_cond2_gt_cond1 / len(keys) * 100))
+    print('   Same: {}/{} ({:.1f}%) items'.format(n_cond1_eq_cond2, len(keys), n_cond1_eq_cond2 / len(keys) * 100))
 
-    for subj_id in subj_ids:
-        subj_df = df[df.Subject == subj_id]
-        cond1_data = subj_df[subj_df.Condition == cond1].sort_values(['ItemNum'])
-        cond2_data = subj_df[subj_df.Condition == cond2].sort_values(['ItemNum'])
 
-        #-- Take only items that exist in both conditions
-        cond1_items = set(cond1_data.ItemNum)
-        cond2_items = set(cond2_data.ItemNum)
-        common_items = cond1_items.intersection(cond2_items)
-        n_items = len(common_items)
-        if n_items < 3:
-            print('Subject {}: only {} items exist in both conditons {}, {}. Skipping'.format(subj_id, n_items, cond1, cond2))
-            continue
-
-        cond1_data = cond1_data[cond1_data.ItemNum.isin(common_items)].reset_index()
-        cond2_data = cond2_data[cond2_data.ItemNum.isin(common_items)].reset_index()
-
-        data1 = cond1_data[dependent_var]
-        data2 = cond2_data[dependent_var]
-
-        #t, p = scipy.stats.ttest_rel(data1, data2)
-        t, p = scipy.stats.wilcoxon(data1, data2)
-        print('Subject {}: t({}) = {:.2f}, 1-tail p = {:.5g}'.format(subj_id, n_items-1, t, p/2))
-        ttest_results.append(TTestResult(subj_id, t, p))
-
-    ttest_results.sort(key=attrgetter('p'), reverse=True)
-
-    non_significant = []
-    for i, r in enumerate(ttest_results):
-        threshold = alpha / (len(subj_ids) - i)
-        non_significant.append(r.p > threshold)
-        print(r.p, threshold, r.p <= threshold)
-
-    sig_data = ['{}({:.4f})'.format(r.subj, r.p) for r, s in zip(ttest_results, non_significant) if s]
-    print('{} participants with non-significant effect (alpha={:.3g}): {}'.format(sum(non_significant), alpha, sig_data))
+#---------------------------------------------------------------------------
+def _get_success_per_item(df, dependent_var):
+    return {(subj, item): succ for subj, item, succ in zip(df.Subject, df.ItemNum, df[dependent_var])}

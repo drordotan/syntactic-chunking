@@ -158,49 +158,60 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
 
 
 #---------------------------------------------------------------------------
-def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None, font_size=8):
+def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, conds=None, cond_names=None, font_size=8,
+                                 get_subj_id_func=str, sort_by_delta=True):
     """
     Plot the mean value for each condition - separate plot per subject
     """
 
-    conds = sorted(df.Condition.unique())
-    assert len(conds) == 2
+    colors = [0.3, 0.6, 0.8]
+
+    if conds is None:
+        conds = sorted(df.Condition.unique())
+
+    n_conds = len(conds)
+    if cond_names:
+        n_missing = len([c for c in conds if c not in cond_names])
+        assert n_missing == 0, 'Invalid cond_names={} (conds={})'.format(cond_names, conds)
+
     subj_ids = sorted(df.Subject.unique())
     n_subjs = len(subj_ids)
 
-    subj_inf = _get_2cond_info_per_subject(conds, dependent_var, df, subj_ids)
+    subj_inf = _get_conds_info_per_subject(conds, dependent_var, df, subj_ids, sort_by_delta)
 
     fig = plt.figure(figsize=fig_size)
 
-    x0 = np.array(range(n_subjs)) * 3
-    plt.bar(x0, [i['c1'] for i in subj_inf], color=[0.3] * 3, zorder=10)
-    plt.bar(x0 + 1, [i['c2'] for i in subj_inf], color=[0.6] * 3, zorder=10)
+    x0 = np.array(range(n_subjs)) * (n_conds + 1)
+    for condnum in range(n_conds):
+        plt.bar(x0 + condnum, [i['c{}'.format(condnum+1)] for i in subj_inf], color=[colors[condnum]] * 3, zorder=10)
 
     ax = plt.gca()
 
-    _format_conds_graph(ax, conds, dy, 2, ymax, font_size=font_size, x_labels=False, cond_names=cond_names)
+    _format_conds_graph(ax, conds, dy, n_conds, ymax, font_size=font_size, x_labels=False, cond_names=cond_names)
 
-    ax.set_xticks(x0 + 0.5)
-    ax.set_xticklabels([sc.utils.clean_subj_id(i['subject']) for i in subj_inf], fontsize=font_size)
+    ax.set_xticks(x0 + (n_conds-1) / 2)
+    ax.set_xticklabels([get_subj_id_func(i['subject']) for i in subj_inf], fontsize=font_size)
 
-    plt.legend([cond_names[c] for c in conds], fontsize=font_size)
+    if cond_names is not None:
+        plt.legend([cond_names[c] for c in conds], fontsize=font_size)
 
     plt.savefig(out_fn)
     plt.close(fig)
 
 
 #---------------------------------------------------------------------------
-def _get_2cond_info_per_subject(conds, dependent_var, df, subj_ids):
+def _get_conds_info_per_subject(conds, dependent_var, df, subj_ids, sort_by_delta):
 
     subj_inf = []
     for subj in subj_ids:
-        i = dict(subject=subj,
-                 c1=df[(df.Condition == conds[0]) & (df.Subject == subj)][dependent_var].mean(),
-                 c2=df[(df.Condition == conds[1]) & (df.Subject == subj)][dependent_var].mean())
-        i['delta'] = i['c2'] - i['c1']
+        i = dict(subject=subj)
+        for condnum in range(len(conds)):
+            i['c{}'.format(condnum+1)] = df[(df.Condition == conds[condnum]) & (df.Subject == subj)][dependent_var].mean()
+        i['delta'] = i['c{}'.format(len(conds))] - i['c1']
         subj_inf.append(i)
 
-    subj_inf.sort(key=itemgetter('delta'), reverse=True)
+    if sort_by_delta:
+        subj_inf.sort(key=itemgetter('delta'), reverse=True)
 
     return subj_inf
 
