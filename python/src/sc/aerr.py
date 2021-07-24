@@ -2,8 +2,11 @@
 import openpyxl
 import re
 import pandas as pd
+import mtl.verbalnumbers.hebrew as hebnums
 
-lexical_classes = 'unit', 'decade', 'hundred', 'unit', 'decade', 'hundred'
+
+one_thousand = hebnums.NumberWord(hebnums.thousands, 1)
+decword_thousand = hebnums.NumberWord(hebnums.decword_thousand, None)
 
 xls_copy_cols = 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPerTarget'
 xls_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'NMissingDigits', 'NMissingClasses')
@@ -15,7 +18,7 @@ xls_optional_cols = 'manual', 'WordOrder'
 
 
 #------------------------------------------------------
-def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, subj_id_transformer=None, per_word=False):
+def analyze_errors(in_fn, out_dir, consider_thousand_as_digit=False, subj_id_transformer=None, per_word=False):
     """
     Analyze the overall error rates (digit, class,word) in each trial
 
@@ -39,7 +42,7 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, 
     ok = True
     for rownum in range(2, in_ws.max_row+1):
         ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word,
-                       result_per_morpheme, consider_thousand_as_digit, use_teens, subj_id_transformer, per_word) and ok
+                       result_per_morpheme, consider_thousand_as_digit, subj_id_transformer, per_word) and ok
 
     if not ok:
         print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
@@ -52,7 +55,7 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit, use_teens=False, 
 
 
 #------------------------------------------------------
-def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit, use_teens,
+def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit,
               subj_id_transformer, per_word):
     """
     Parse a single row, copy it to the output file
@@ -79,20 +82,12 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
     for colname in xls_copy_cols:
         out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
 
-    target_segments = parse_target_or_response(raw_target, rownum, use_teens)
-    target = collapse_segments(target_segments)
+    target_segments, target, target_digits = analyze_target(raw_target, rownum)
+    n_target_digits = len(target_digits)
+
     if n_target_words != len(target):
         print("Error in line {}: Invalid number of words ({}), expecting {} words".format(rownum, len(target), n_target_words))
         return False
-
-    if consider_thousand_as_digit:
-        target_digits = [t[1] for t in target]
-    else:
-        target_digits = [t[1] for t in target if t[0] != 'thousand']
-
-    target_digits = target_digits[::-1]  # put the unit digit in position 1
-
-    n_target_digits = len(target_digits)
 
     if manual_coding:
 
@@ -105,22 +100,7 @@ def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morph
         response_digits = ()
 
     else:
-
-        response_segments = parse_response(raw_response, rownum, target_segments, use_teens)
-        if target_segments is None or response_segments is None:
-            return False
-
-        response = collapse_segments(response_segments)
-
-        n_word_errs = n_missing_target_items(target, response)
-        n_class_errs = _n_missing_classes(target, response)
-
-        if consider_thousand_as_digit:
-            response_digits = [r[1] for r in response]
-        else:
-            response_digits = [r[1] for r in response if r[0] != 'thousand']
-
-        n_digit_errs = n_missing_target_items(target_digits, response_digits)
+        n_word_errs, n_class_errs, n_digit_errs, response_digits = analyze_response(raw_response, target, target_segments, target_digits, rownum)
 
     _save_value(out_ws, rownum, 'NTargetDigits', n_target_digits)
     _save_value(out_ws, rownum, 'NMissingWords', n_word_errs)
@@ -194,14 +174,44 @@ def _nullto0(v):
 
 
 #------------------------------------------------------
+def analyze_target(raw_target, rownum):
+    target_segments = parse_target_or_response(raw_target, rownum)
+    target = collapse_segments(target_segments)
+    target = [decword_thousand if t == one_thousand else t for t in target]
+
+    target_digits = [t.digit for t in target if t.digit is not None][::-1]  # put the ones word in position 1
+
+    return target_segments, target, target_digits
+
+
+#------------------------------------------------------
+def analyze_response(raw_response, target, target_segments, target_digits, rownum):
+
+    response_segments = parse_response(raw_response, rownum, target_segments)
+    if target_segments is None or response_segments is None:
+        return False
+
+    response = collapse_segments(response_segments)
+    response = [decword_thousand if r == one_thousand else r for r in response]
+
+    n_word_errs = n_missing_target_items(target, response)
+    n_class_errs = _n_missing_classes(target, response)
+
+    response_digits = [r.digit for r in response if r.digit is not None]
+    n_digit_errs = n_missing_target_items(target_digits, response_digits)
+
+    return n_word_errs, n_class_errs, n_digit_errs, response_digits
+
+
+#------------------------------------------------------
 def _save_value(out_ws, rownum, colname, value):
     out_ws.cell(rownum, 1 + xls_out_cols.index(colname)).value = value
 
 
 #------------------------------------------------------
 def _n_missing_classes(target, response):
-    target = [t[0] for t in target]
-    response = [r[0] for r in response]
+    target = [t.lexical_class for t in target]
+    response = [r.lexical_class for r in response]
 
     for r in response:
         if r in target:
@@ -223,7 +233,7 @@ def n_missing_target_items(target_items, response_items):
 
 
 #------------------------------------------------------
-def parse_response(response_str, rownum, target_segments, use_teens):
+def parse_response(response_str, rownum, target_segments):
 
     if response_str is None:
         return None
@@ -242,18 +252,18 @@ def parse_response(response_str, rownum, target_segments, use_teens):
         response_segments_unknown_loc = []
     else:
         response_str = m.group(1)
-        response_segments_unknown_loc = parse_target_or_response(m.group(2), rownum, use_teens)
+        response_segments_unknown_loc = parse_target_or_response(m.group(2), rownum)
         if response_segments_unknown_loc is None:
             return None
 
-    response_segments = parse_target_or_response(response_str, rownum, use_teens)
+    response_segments = parse_target_or_response(response_str, rownum)
     if response_segments is None:
         return None
 
     target_has_duplicate_segments = len(target_segments) != len(set(target_segments))
 
     if len(response_segments) != len(target_segments) and ['correct'] in response_segments:
-        print('WARNING: "+" is ambiguous because the target and response have different number of segments. '+
+        print('WARNING: "+" is ambiguous because the target and response have different number of segments. ' +
               'Line {} ignored'.format(rownum))
         return None
 
@@ -279,7 +289,7 @@ def collapse_segments(parsed_segments):
 
 
 #------------------------------------------------------
-def parse_target_or_response(raw_text, rownum, use_teens):
+def parse_target_or_response(raw_text, rownum):
     """
     Return a list of segments, each of which is a list of words
 
@@ -299,11 +309,11 @@ def parse_target_or_response(raw_text, rownum, use_teens):
         m = re.match('^([0-9,]*)\\s*t\\s*([0-9,]+)?$', seg)
 
         if m is None:
-            parsed_segment = [ parse_segment_into_word_list(seg, use_teens) ]
+            parsed_segment = [ parse_segment_into_word_list(seg) ]
         else:
-            parsed_segment = _parse_pre_thousand_segment(m, seg, use_teens)
+            parsed_segment = _parse_pre_thousand_segment(m, seg)
             if m.group(2) is not None:
-                parsed_segment.append(parse_segment_into_word_list(m.group(2), use_teens))
+                parsed_segment.append(parse_segment_into_word_list(m.group(2)))
 
         if None in parsed_segment:  # invalid format
             print('WARNING: unsupported target/response format: "{}" -- line {} ignored'.format(raw_text, rownum))
@@ -318,33 +328,32 @@ def parse_target_or_response(raw_text, rownum, use_teens):
 
 
 #------------------------------------------------------
-def _parse_pre_thousand_segment(matcher, segment, use_teens):
+def _parse_pre_thousand_segment(matcher, segment):
     """ Parse the 'thousand' and the preceding digits """
 
     if len(matcher.group(1)) == 0:
         # -- The word "thousand" with no preceding digit
-        return [ parse_segment_into_word_list('t', use_teens) ]
+        return [parse_segment_into_word_list('t')]
 
     elif len(matcher.group(1)) == 1:
         # -- A 4-digit number: the "thousand" is combined with the preceding digit
-        return [ parse_segment_into_word_list(matcher.group(1) + '000', False) ]
+        return [parse_segment_into_word_list(matcher.group(1) + '000')]
 
     elif len(matcher.group(1)) in (2, 3):
         # -- A 5- or 6-digit number: the "thousand" is a separate word
-        return [parse_segment_into_word_list(matcher.group(1), use_teens), parse_segment_into_word_list('t', False)]
+        return [parse_segment_into_word_list(matcher.group(1)), parse_segment_into_word_list('t')]
 
     else:
         raise Exception('Unsupported format: {}'.format(segment))
 
 
 #------------------------------------------------------
-def parse_segment_into_word_list(segment, use_teens):
+def parse_segment_into_word_list(segment):
     """
     Parse a number into a series of words
-    """
 
-    if segment == 't' or segment == '1000':
-        return [('thousand', 1)]
+    :param segment: a string describing one grammatical segment (one number)
+    """
 
     if segment in ('+', '!'):
         return ['correct']
@@ -354,32 +363,7 @@ def parse_segment_into_word_list(segment, use_teens):
 
     segment = segment.replace(',', '')  # delete commas
 
-    if re.match('^\\d+$', segment) is None:
-        return None
-
-    digits = [int(d) for d in segment[::-1]]
-    ndigits = len(segment)
-    if use_teens and ndigits > 1 and digits[1] == 1 and digits[0] != 0:
-        digits[1] = 0
-        digits[0] += 10
-
-    result = []
-    for i, digit in enumerate(digits):
-        if ndigits == 4 and i == 3:
-            result.append(('thousand', digit))
-
-        elif i == 0 and digit > 10:
-            result.append(('teens', digit-10))
-
-        elif digit != 0:
-            result.append((lexical_classes[i], digit))
-
-        if i == 2 and ndigits > 4:
-            # todo the following works for this experiment, but may not work for others:
-            #      the word "thousand" in 5/6-digit numbers may count as a digit error versus numbers like 31
-            result.append(('thousand', 1))
-
-    return result[::-1]
+    return hebnums.number_to_words(segment)
 
 
 #------------------------------------------------------

@@ -159,12 +159,10 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
 
 #---------------------------------------------------------------------------
 def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, conds=None, cond_names=None, font_size=8,
-                                 get_subj_id_func=str, sort_by_delta=True):
+                                 get_subj_id_func=str, sort_by_delta=True, colors = (0.3, 0.6, 0.8)):
     """
     Plot the mean value for each condition - separate plot per subject
     """
-
-    colors = [0.3, 0.6, 0.8]
 
     if conds is None:
         conds = sorted(df.Condition.unique())
@@ -191,6 +189,8 @@ def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, f
 
     ax.set_xticks(x0 + (n_conds-1) / 2)
     ax.set_xticklabels([get_subj_id_func(i['subject']) for i in subj_inf], fontsize=font_size)
+    plt.xlabel('Participant', fontsize=font_size)
+    plt.ylabel('Accuracy', fontsize=font_size)
 
     if cond_names is not None:
         plt.legend([cond_names[c] for c in conds], fontsize=font_size)
