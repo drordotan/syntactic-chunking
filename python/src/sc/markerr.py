@@ -1,4 +1,6 @@
-
+"""
+Mark errors in the results file
+"""
 import openpyxl
 import re
 import pandas as pd
@@ -18,15 +20,17 @@ xls_optional_cols = 'manual', 'WordOrder'
 
 
 #------------------------------------------------------
-def analyze_errors(in_fn, out_dir, consider_thousand_as_digit=False, subj_id_transformer=None, per_word=False):
+def analyze_errors(in_fn, out_dir, consider_thousand_as_digit=False, subj_id_transformer=None, accuracy_per_digit=False):
     """
-    Analyze the overall error rates (digit, class,word) in each trial
+    Analyze the error rates (digit, class, morpheme, word) in each trial
 
     :param in_fn: Excel file with the raw data (uncoded)
-    :param out_dir: Directory for output file
+    :param out_dir: Directory for output files
     :param consider_thousand_as_digit:  Whether the word "thousand" should count towards digit errors
     :param use_teens: Consider teens as a separate class
     :param subj_id_transformer: Function for transfoming the subject ID field
+    :param accuracy_per_digit: This concerns the output files per word/morpheme: whether to compute the word/digit accuracy
+            for each specific word or less precisely. Value=True is impossible if the target contains duplicate digits.
     """
 
     in_ws, col_inds = _open_input_file(in_fn)
@@ -41,8 +45,7 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit=False, subj_id_tra
 
     ok = True
     for rownum in range(2, in_ws.max_row+1):
-        ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word,
-                       result_per_morpheme, consider_thousand_as_digit, subj_id_transformer, per_word) and ok
+        ok = parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, subj_id_transformer, accuracy_per_digit) and ok
 
     if not ok:
         print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
@@ -50,13 +53,12 @@ def analyze_errors(in_fn, out_dir, consider_thousand_as_digit=False, subj_id_tra
     out_ws.freeze_panes = out_ws['A2']
     auto_col_width(out_ws)
     out_wb.save(out_dir + '/data_coded.xlsx')
-    pd.DataFrame(result_per_word).to_csv(out_dir + '/data_coded_words.csv', index=False)
-    pd.DataFrame(result_per_morpheme).to_csv(out_dir + '/data_coded_morphemes.csv', index=False)
+    pd.DataFrame(result_per_word).to_csv(out_dir+'/data_coded_words.csv', index=False)
+    pd.DataFrame(result_per_morpheme).to_csv(out_dir+'/data_coded_morphemes.csv', index=False)
 
 
 #------------------------------------------------------
-def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, consider_thousand_as_digit,
-              subj_id_transformer, per_word):
+def parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme, subj_id_transformer, per_word):
     """
     Parse a single row, copy it to the output file
     Return True if processed OK.

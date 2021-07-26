@@ -1,9 +1,9 @@
 import unittest
 
-from sc.aerr import parse_segment_into_word_list
+from sc.markerr import parse_segment_into_word_list
 
 
-from sc.aerr import *
+from sc.markerr import *
 
 
 #------------------------------------------------------
