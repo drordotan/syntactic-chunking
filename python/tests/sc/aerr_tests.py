@@ -1,25 +1,23 @@
 import unittest
 
-from sc.markerr import parse_segment_into_word_list
-
-
 from sc.markerr import *
 
 
 #------------------------------------------------------
-def get_n_errors(raw_target, raw_response):
-    target_segments, target, target_digits = analyze_target(raw_target, 0)
-    n_word_errs, n_class_errs, n_digit_errs, response_digits = analyze_response(raw_response, target, target_segments, target_digits, 0)
+def get_n_errors(raw_target, raw_response, consider_thousand_as_digit=False):
+    target_segments, target, target_digits = analyze_target(raw_target, consider_thousand_as_digit, 0)
+    n_word_errs, n_class_errs, n_digit_errs, response_digits = \
+        analyze_response(raw_response, target, target_segments, target_digits, consider_thousand_as_digit, 0)
     return n_word_errs, n_class_errs, n_digit_errs
 
 
-
+#============================================================================================
 class ParseSegmentTest(unittest.TestCase):
 
     #-------------------
     #-- No errors
     #-------------------
-
+    # 
     #-- Simple cases
 
     def test_same_2(self):

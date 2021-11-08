@@ -1,7 +1,9 @@
-
+from operator import itemgetter
 import numpy as np
 from collections import namedtuple
 import scipy.stats
+import scipy.signal
+import pandas as pd
 
 import mtl.utils as mu
 
@@ -98,3 +100,44 @@ def _get_effect_size(df, conds, dependent_var):
     means2 = df[df.Condition == conds[1]].groupby('Subject')[dependent_var].aggregate(np.mean)
 
     return [means2[s] - means1[s] for s in subjects]
+
+
+#---------------------------------------------------------------------------
+def get_value_per_subj_and_cond(conds, dependent_var, df, subj_ids, sort_by_delta=False):
+    """
+    Get the value of the dependent variable in each condition for each subject
+
+    Returns a list with one dict per subject. The dict entries are cNNN:VVV, where NNN is the condition number (1, 2, ...) and VVV is
+    the dependent variable average value in that condition.
+    The dict also contains a 'delta' key, whose value is the difference between the last and first conditions.
+    """
+
+    subj_inf = []
+    for subj in subj_ids:
+        i = dict(subject=subj)
+        for condnum in range(len(conds)):
+            i['c{}'.format(condnum+1)] = df[(df.Condition == conds[condnum]) & (df.Subject == subj)][dependent_var].mean()
+        i['delta'] = i['c{}'.format(len(conds))] - i['c1']
+        subj_inf.append(i)
+
+    if sort_by_delta:
+        subj_inf.sort(key=itemgetter('delta'), reverse=True)
+
+    return subj_inf
+
+
+#---------------------------------------------------------------------------
+def correlate_sc_effect_vs_reading_errors(df, dependent_var, reading_filename):
+
+    read_df = pd.read_excel(reading_filename)
+
+    subj_ids = sorted(set(df.Subject.unique()).intersection(set(read_df.subject)))
+
+    sc_effect = get_value_per_subj_and_cond(('A', 'B'), dependent_var, df, subj_ids)
+    sc_effect = [s['delta'] for s in sc_effect]
+
+    reading_errors = [float(read_df.syntactic_errors[read_df.subject == s] / read_df.n_items[read_df.subject == s]) for s in subj_ids]
+
+    r, p = scipy.stats.pearsonr(sc_effect, reading_errors)
+    if r > 0:
+        print('The correlation between syntactic chunking effect size and the rate of syntactic errors in reading: r={:.3f}, p={}'.format(r, mu.p_str(p/2)))

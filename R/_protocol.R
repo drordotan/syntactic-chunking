@@ -140,3 +140,13 @@ sdata4 = load_data(paste(data_dir, 'exp4/data_coded.csv', sep='/'), nadin=TRUE)
 compare_conditions(sdata4, 'A', 'B', 'PMissingWords')
 compare_conditions(sdata4, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata4, 'A', 'B', 'PMissingClasses')
+
+#--------------------------------------------------------------------------
+# Experiment 4
+#--------------------------------------------------------------------------
+
+sdata5 = load_data(paste(data_dir, 'exp5/data_coded.csv', sep='/'), nadin=TRUE)
+
+compare_conditions(sdata5, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata5, 'A', 'B', 'PMissingDigits')
+compare_conditions(sdata5, 'A', 'B', 'PMissingClasses')

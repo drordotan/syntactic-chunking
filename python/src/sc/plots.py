@@ -2,11 +2,12 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from operator import itemgetter
 import sc.utils
 
 
 #---------------------------------------------------------------------------
+from sc.analyze import get_value_per_subj_and_cond
+
 def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None):
     """
     Plot the mean value for each condition
@@ -175,7 +176,7 @@ def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, f
     subj_ids = sorted(df.Subject.unique())
     n_subjs = len(subj_ids)
 
-    subj_inf = _get_conds_info_per_subject(conds, dependent_var, df, subj_ids, sort_by_delta)
+    subj_inf = get_value_per_subj_and_cond(conds, dependent_var, df, subj_ids, sort_by_delta)
 
     fig = plt.figure(figsize=fig_size)
 
@@ -190,30 +191,13 @@ def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, f
     ax.set_xticks(x0 + (n_conds-1) / 2)
     ax.set_xticklabels([get_subj_id_func(i['subject']) for i in subj_inf], fontsize=font_size)
     plt.xlabel('Participant', fontsize=font_size)
-    plt.ylabel('Accuracy', fontsize=font_size)
+    plt.ylabel('Error rate', fontsize=font_size)
 
     if cond_names is not None:
         plt.legend([cond_names[c] for c in conds], fontsize=font_size)
 
     plt.savefig(out_fn)
     plt.close(fig)
-
-
-#---------------------------------------------------------------------------
-def _get_conds_info_per_subject(conds, dependent_var, df, subj_ids, sort_by_delta):
-
-    subj_inf = []
-    for subj in subj_ids:
-        i = dict(subject=subj)
-        for condnum in range(len(conds)):
-            i['c{}'.format(condnum+1)] = df[(df.Condition == conds[condnum]) & (df.Subject == subj)][dependent_var].mean()
-        i['delta'] = i['c{}'.format(len(conds))] - i['c1']
-        subj_inf.append(i)
-
-    if sort_by_delta:
-        subj_inf.sort(key=itemgetter('delta'), reverse=True)
-
-    return subj_inf
 
 
 #---------------------------------------------------------------------------

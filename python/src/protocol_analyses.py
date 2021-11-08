@@ -96,7 +96,6 @@ sc.analyze.compare_conds_per_item(exp3, 'A', 'B', 'PMissingMorphemes')
 #  Experiment 4
 #--------------------------------------------------------------------------------------------------
 
-
 exp4 = pd.read_excel(d+'exp4/data_coded.xlsx')
 
 sc.plots.plot_cond_means_multiple_measures(exp4, dependent_vars=['PMissingMorphemes', 'PMissingDigits', 'PMissingClasses'],
@@ -111,3 +110,19 @@ sc.plots.plot_2cond_means_per_subject(exp4, 'PMissingMorphemes', fig_dir+'exp4_p
 
 #-- Compare % of specific items that are better in each condition (PStat:Exp3ComparePerItem)
 sc.analyze.compare_conds_per_item(exp4, 'A', 'B', 'PMissingMorphemes')
+
+#-- Compare effect size between experiments 3 and 4 (PStat:EffectSize3Vs4)
+sc.analyze.compare_effect_size('PMissingMorphemes', exp3, exp4, expnames=(3, 4))
+sc.analyze.compare_effect_size('PMissingDigits', exp3, exp4, expnames=(3, 4))
+sc.analyze.compare_effect_size('PMissingClasses', exp3, exp4, expnames=(3, 4))
+
+
+#--------------------------------------------------------------------------------------------------
+#  Experiment 5
+#--------------------------------------------------------------------------------------------------
+
+exp5 = pd.read_excel(d+'exp5/data_coded.xlsx')
+
+#-- (PStat:FigExp5PerSubj)
+sc.plots.plot_2cond_means_per_subject(exp5, 'PMissingMorphemes', fig_dir+'exp5_per_subj_morph.pdf', ymax=0.42, fig_size=(6, 6),
+                                      cond_names=dict(A='Grammatical', B='Fragmented'))
