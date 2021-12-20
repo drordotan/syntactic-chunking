@@ -55,6 +55,60 @@ def compare_conds_per_item(df, cond1, cond2, dependent_var):
 
 
 #---------------------------------------------------------------------------
+def compare_conds_per_subj(df, cond_good, cond_bad, dependent_var):
+    """
+    Compare the performance between 2 conditions, separately for each subject
+
+    :param df:
+    :param cond_good: The condition in which better performance is expected
+    :param cond_bad: The condition in which worse performance is expected
+    :param dependent_var:
+    """
+
+    t_and_p = []
+
+    subj_ids = sorted(df.Subject.unique())
+    for subj in subj_ids:
+        sdf1 = df[(df.Subject == subj) & (df.Condition == cond_good)].sort_values('ItemNum')
+        sdf2 = df[(df.Subject == subj) & (df.Condition == cond_bad)].sort_values('ItemNum')
+        assert list(sdf1.ItemNum) == list(sdf2.ItemNum)
+
+        if sdf1[dependent_var].mean() < sdf2[dependent_var].mean():
+            t, p = scipy.stats.ttest_rel(sdf1[dependent_var], sdf2[dependent_var])
+            p = p / 2
+        else:
+            t = None
+            p = 1
+
+        nrows = sdf1.shape[0]
+        t_and_p.append((t, p / 2, nrows, subj))
+
+    t_and_p.sort(key=itemgetter(1))
+
+    min_t = None
+    corrected_ps = []
+
+    div_by = len(subj_ids)
+    for t, p, n, subj in t_and_p:
+        if t is None:
+            print('Subject {}: Opposite to prediction'.format(subj))
+
+        else:
+            corrected_p = p * div_by
+            corrected_ps.append(corrected_p)
+
+            print('Subject {}: t({}) = {:.2f}, p = {}, corrected p = {}'.format(subj, n-1, t, mu.p_str(p), mu.p_str(corrected_p)))
+
+            if min_t is None or t < min_t:
+                min_t = t
+
+        div_by -= 1
+
+    print('Overall: t > {:.2f}'.format(min_t))
+    print('Sorted corrected p: {}'.format([mu.p_str(p) for p in sorted(corrected_ps, reverse=True)]))
+
+
+#---------------------------------------------------------------------------
 def _get_success_per_item(df, dependent_var):
     return {(subj, item): succ for subj, item, succ in zip(df.Subject, df.ItemNum, df[dependent_var])}
 

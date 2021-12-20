@@ -37,7 +37,7 @@ def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None,
 
 #---------------------------------------------------------------------------
 def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_ticks, fig_size, cond_names, conditions=None, dependent_var_names=None,
-                                      cond_comparison_text=None, colors=None, font_size=None):
+                                      cond_comparison_text=None, colors=None, font_size=None, show_legend=True):
     """
     Plot the mean value for each condition - multiple measures
 
@@ -111,7 +111,8 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
                 y2 = mean_per_var_and_cond[(dependent_vars[i_dv], conditions[i_cond+1])]
                 sc.utils.plot_bar_comparison(ax, x1, x2, y1, y2, 0.02, cct[i_cond], 0.005)
 
-    plt.legend([cond_names[c] for c in conditions], fontsize=font_size)
+    if show_legend:
+        plt.legend([cond_names[c] for c in conditions], fontsize=font_size)
 
     plt.savefig(out_fn)
     plt.close(fig)
@@ -160,7 +161,7 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
 
 #---------------------------------------------------------------------------
 def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, conds=None, cond_names=None, font_size=8,
-                                 get_subj_id_func=str, sort_by_delta=True, colors = (0.3, 0.6, 0.8)):
+                                 get_subj_id_func=str, sort_by_delta=True, colors = (0.3, 0.6, 0.8), legend_loc=None):
     """
     Plot the mean value for each condition - separate plot per subject
     """
@@ -194,7 +195,7 @@ def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, f
     plt.ylabel('Error rate', fontsize=font_size)
 
     if cond_names is not None:
-        plt.legend([cond_names[c] for c in conds], fontsize=font_size)
+        plt.legend([cond_names[c] for c in conds], fontsize=font_size, loc=legend_loc)
 
     plt.savefig(out_fn)
     plt.close(fig)

@@ -42,17 +42,8 @@ sdata1m = sdata1m[sdata1m$block != 'R',]
 compare_conditions_logistic(sdata1w, 'A', 'B', 'wordOK')
 compare_conditions_morphemes(sdata1m, 'A', 'B', morpheme_type = 'digit')
 
-compare_conditions_per_subj(sdata1, 'B', 'D', 'PMissingMorphemes')
-
-compare_conditions_per_subj(sdata1m, 'B', 'D')
-compare_conditions_logistic_per_subj(sdata1, )
-
 
 #-- Compare conditions: Blocked
-
-compare_conditions(sdata1, 'A', 'B', 'PMissingWords')
-compare_conditions(sdata1, 'B', 'C', 'PMissingWords')
-compare_conditions(sdata1, 'C', 'D', 'PMissingWords')
 
 compare_conditions(sdata1, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata1, 'B', 'C', 'PMissingMorphemes')
@@ -65,6 +56,10 @@ compare_conditions(sdata1, 'C', 'D', 'PMissingDigits')
 compare_conditions(sdata1, 'A', 'B', 'PMissingClasses')
 compare_conditions(sdata1, 'B', 'C', 'PMissingClasses')
 compare_conditions(sdata1, 'C', 'D', 'PMissingClasses')
+
+compare_conditions(sdata1, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata1, 'B', 'C', 'PMissingWords')
+compare_conditions(sdata1, 'C', 'D', 'PMissingWords')
 
 compare_conditions_logistic_per_subj(sdata1, 'B', 'D', 'wordOK')
 
@@ -79,12 +74,7 @@ compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'A', 'B', 'PMissingMorp
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'B', 'C', 'PMissingMorphemes')
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'C', 'D', 'PMissingMorphemes')
 
-#-- Compare conditions: Mixed
-compare_conditions(sdata2, 2, 3, 'PMissingWords')
-compare_conditions(sdata2, 3, 4, 'PMissingWords')
-compare_conditions(sdata2, 2, 4, 'PMissingWords')
-condition_linear_effect(sdata2, 'PMissingWords')
-
+#-- Compare conditions: Mixed (Experiment 2) (Exp2Effects)
 compare_conditions(sdata2, 2, 3, 'PMissingMorphemes')
 compare_conditions(sdata2, 3, 4, 'PMissingMorphemes')
 compare_conditions(sdata2, 2, 4, 'PMissingMorphemes')
@@ -99,6 +89,11 @@ compare_conditions(sdata2, 2, 3, 'PMissingClasses')
 compare_conditions(sdata2, 3, 4, 'PMissingClasses')
 compare_conditions(sdata2, 2, 4, 'PMissingClasses')
 condition_linear_effect(sdata2, 'PMissingClasses')
+
+compare_conditions(sdata2, 2, 3, 'PMissingWords')
+compare_conditions(sdata2, 3, 4, 'PMissingWords')
+compare_conditions(sdata2, 2, 4, 'PMissingWords')
+condition_linear_effect(sdata2, 'PMissingWords')
 
 #-- Compare D vs. Mixed
 compare_conditions(sdata1_all, 'D', 'R', 'PMissingWords', item_intercept = FALSE)
@@ -137,7 +132,7 @@ compare_conditions(sdata3, 'A', 'B', 'PMissingClasses')
 
 sdata4 = load_data(paste(data_dir, 'exp4/data_coded.csv', sep='/'), nadin=TRUE)
 
-compare_conditions(sdata4, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata4, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata4, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata4, 'A', 'B', 'PMissingClasses')
 
@@ -147,6 +142,6 @@ compare_conditions(sdata4, 'A', 'B', 'PMissingClasses')
 
 sdata5 = load_data(paste(data_dir, 'exp5/data_coded.csv', sep='/'), nadin=TRUE)
 
-compare_conditions(sdata5, 'A', 'B', 'PMissingWords')
+compare_conditions(sdata5, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata5, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata5, 'A', 'B', 'PMissingClasses')

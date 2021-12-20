@@ -14,6 +14,8 @@ RED = '#BF5860'
 GREENS = ('#455C41', '#62845C', '#79A472', '#A2D49A')
 GREEN = GREENS[2]
 
+supp_fig_per_subj_size = (8, 6)
+
 #--------------------------------------------------------------------------------------------------
 #  Experiment 1 & 2
 #--------------------------------------------------------------------------------------------------
@@ -55,6 +57,9 @@ sc.plots.plot_cond_means_per_subject(exp1, 'PMissingClasses', fig_dir+'exp1_per_
 #-- Compare % of specific items that are better in each condition (PStat:Exp1ComparePerItem)
 sc.analyze.compare_conds_per_item(exp1, 'D', 'B', 'PMissingMorphemes')
 
+#-- Compare the best and worst condition separately for each subject (Pstat:Exp1CompareBDPerSubj)
+sc.analyze.compare_conds_per_subj(exp1, 'B', 'D', 'PMissingMorphemes')
+
 
 #  Experiment 2: Mixed
 #-------------------------
@@ -65,7 +70,7 @@ sc.plots.plot_cond_means_multiple_measures(exp2, dependent_vars=['PMissingMorphe
                                            cond_names={2: '2 segments', 3: '3 segments', 4: '4 segments'}, conditions=(2, 3, 4),
                                            dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=GREENS[1:], font_size=8)
 
-sc.plots.plot_2cond_means_per_subject(exp2, 'PMissingMorphemes', fig_dir+'exp2_per_subj_morph.pdf', ymax=0.6, fig_size=(6, 4),
+sc.plots.plot_2cond_means_per_subject(exp2, 'PMissingMorphemes', fig_dir+'exp2_per_subj_morph.pdf', ymax=0.6, fig_size=supp_fig_per_subj_size,
                                       cond_names={2:'Grammatical (2 segments)', 3:'Middle (3 segments)', 4:'Fragmented (4 segments)'},
                                       conds=[2, 3, 4], colors = (0.3, 0.9, 0.6))
 
@@ -86,7 +91,7 @@ sc.plots.plot_cond_means_multiple_measures(exp3, dependent_vars=['PMissingMorphe
                                            dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=(GREEN, RED), font_size=8)
 
 #-- (PStat:FigExp3PerSubj)
-sc.plots.plot_2cond_means_per_subject(exp3, 'PMissingMorphemes', fig_dir+'exp3_per_subj_morph.pdf', ymax=0.42, fig_size=(6, 6),
+sc.plots.plot_2cond_means_per_subject(exp3, 'PMissingMorphemes', fig_dir+'exp3_per_subj_morph.pdf', ymax=0.42, fig_size=supp_fig_per_subj_size,
                                       cond_names=dict(A='Grammatical', B='Fragmented'))
 
 #-- Compare % of specific items that are better in each condition (PStat:Exp3ComparePerItem)
@@ -102,10 +107,11 @@ sc.plots.plot_cond_means_multiple_measures(exp4, dependent_vars=['PMissingMorphe
                                            out_fn=fig_dir+'exp4_cond_mean_all.pdf', ymax=0.4, d_y_ticks=.05, fig_size=(4, 2),
                                            cond_names=dict(A='Grammatical', B='Fragmented'), conditions=('A', 'B'),
                                            cond_comparison_text=[['***'], ['***'], ['***']],
-                                           dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=(GREEN, RED), font_size=8)
+                                           dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=(GREEN, RED), font_size=8,
+                                           show_legend=False)
 
 #-- (PStat:FigExp4PerSubj)
-sc.plots.plot_2cond_means_per_subject(exp4, 'PMissingMorphemes', fig_dir+'exp4_per_subj_morph.pdf', ymax=0.42, fig_size=(6, 6),
+sc.plots.plot_2cond_means_per_subject(exp4, 'PMissingMorphemes', fig_dir+'exp4_per_subj_morph.pdf', ymax=0.42, fig_size=supp_fig_per_subj_size,
                                       cond_names=dict(A='Grammatical', B='Fragmented'))
 
 #-- Compare % of specific items that are better in each condition (PStat:Exp3ComparePerItem)
@@ -123,6 +129,14 @@ sc.analyze.compare_effect_size('PMissingClasses', exp3, exp4, expnames=(3, 4))
 
 exp5 = pd.read_excel(d+'exp5/data_coded.xlsx')
 
+#-- (PStat:FigExp4)
+sc.plots.plot_cond_means_multiple_measures(exp5, dependent_vars=['PMissingMorphemes', 'PMissingDigits', 'PMissingClasses'],
+                                           out_fn=fig_dir+'exp5_cond_mean_all.pdf', ymax=0.34, d_y_ticks=.05, fig_size=(4, 2),
+                                           cond_names=dict(A='Grammatical', B='Fragmented'), conditions=('A', 'B'),
+                                           cond_comparison_text=[['***'], ['***'], ['***']],
+                                           dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=(GREEN, RED), font_size=8,
+                                           show_legend=False)
+
 #-- (PStat:FigExp5PerSubj)
-sc.plots.plot_2cond_means_per_subject(exp5, 'PMissingMorphemes', fig_dir+'exp5_per_subj_morph.pdf', ymax=0.42, fig_size=(6, 6),
-                                      cond_names=dict(A='Grammatical', B='Fragmented'))
+sc.plots.plot_2cond_means_per_subject(exp5, 'PMissingMorphemes', fig_dir+'exp5_per_subj_morph.pdf', ymax=0.49, fig_size=(8,6),
+                                      cond_names=dict(A='Grammatical', B='Fragmented'), legend_loc='upper right')
