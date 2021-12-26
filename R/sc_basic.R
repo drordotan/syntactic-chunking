@@ -1,24 +1,9 @@
 
 #--------------------------------------------------------------------------------------------------
-load_data <- function(filename, nadin=FALSE, useNErrExcludingOrder=FALSE) {
+load_data <- function(filename, useNErrExcludingOrder=FALSE) {
   sdata = read.csv(filename)
-  
-  if (nadin) {
-    
-    if (useNErrExcludingOrder) {
-      sdata$NMissingWords = sdata$NErrExcludingOrder
-    }
-    
-    for (colname in c('NMissingWords', 'NMissingDigits', 'NMissingClasses')) {
-      sdata[is.na(sdata[, colname]), colname] = 0
-    }
-    
-    sdata$PMissingWords = sdata$NMissingWords / sdata$NWordsPerTarget
-    sdata$PMissingDigits = sdata$NMissingDigits / sdata$NWordsPerTarget
-    sdata$PMissingClasses = sdata$NMissingClasses / sdata$NWordsPerTarget
-  }
-  
   sdata$ItemNum <- factor(sdata$ItemNum)
+  sdata$Subject <- factor(sdata$Subject)
   return(sdata)
 }
 
@@ -52,6 +37,7 @@ compare_conditions <- function(sdata, cond1, cond2, dependent_var, item_intercep
   formula1 = sprintf('%s ~ cond2 + (1|Subject)%s', dependent_var, item_intercept_factor)
   formula0 = sprintf('%s ~ (1|Subject)%s', dependent_var, item_intercept_factor)
   
+  print(formula1)
   if (logistic) {
     mdl1 = glmer(as.formula(formula1), data = sdata, family=binomial) 
     mdl0 = glmer(as.formula(formula0), data = sdata, family=binomial) 

@@ -62,7 +62,9 @@ class ErrorAnalyzer(object):
         for rownum in range(2, in_ws.max_row+1):
             ok = self.parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme) and ok
 
-        if not ok:
+        if ok:
+            print('{} rows were processed, no errors found.'.format(in_ws.max_row-1))
+        else:
             print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
 
         out_ws.freeze_panes = out_ws['A2']

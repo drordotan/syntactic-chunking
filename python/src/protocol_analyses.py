@@ -129,7 +129,7 @@ sc.analyze.compare_effect_size('PMissingClasses', exp3, exp4, expnames=(3, 4))
 
 exp5 = pd.read_excel(d+'exp5/data_coded.xlsx')
 
-#-- (PStat:FigExp4)
+#-- (PStat:FigExp5)
 sc.plots.plot_cond_means_multiple_measures(exp5, dependent_vars=['PMissingMorphemes', 'PMissingDigits', 'PMissingClasses'],
                                            out_fn=fig_dir+'exp5_cond_mean_all.pdf', ymax=0.34, d_y_ticks=.05, fig_size=(4, 2),
                                            cond_names=dict(A='Grammatical', B='Fragmented'), conditions=('A', 'B'),

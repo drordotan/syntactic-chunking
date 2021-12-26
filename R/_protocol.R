@@ -14,14 +14,13 @@ data_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/dat
 source(paste(scripts_dir, 'utils.R', sep='/'))
 source(paste(scripts_dir, 'sc_basic.R', sep='/'))
 
-Sys.setenv("R_IS_ASSIGNING" = FALSE)
+Sys.setenv("R_IS_ASSIGNING" = 0)
 
 #--------------------------------------------------------------------------
 # Experiment 1 & 2
 #--------------------------------------------------------------------------
 
 sdata12 = load_data(paste(data_dir, 'exp1&2/data_coded.csv', sep='/'))
-#sdata12 = load_data(paste(data_dir, 'exp1&2/data_coded.csv', sep='/'), nadin=TRUE, useNErrExcludingOrder = TRUE)
 sdata1 = sdata12[sdata12$Block != 'R',]
 sdata2 = sdata12[sdata12$Block == 'R',]
 sdata1_all = sdata1
@@ -38,12 +37,12 @@ sdata2m = sdata1m[sdata1m$block == 'R',]
 sdata1m = sdata1m[sdata1m$block != 'R',]
 
 
+#-- Experiment 1
+#------------------
 
 compare_conditions_logistic(sdata1w, 'A', 'B', 'wordOK')
 compare_conditions_morphemes(sdata1m, 'A', 'B', morpheme_type = 'digit')
 
-
-#-- Compare conditions: Blocked
 
 compare_conditions(sdata1, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata1, 'B', 'C', 'PMissingMorphemes')
@@ -74,7 +73,10 @@ compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'A', 'B', 'PMissingMorp
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'B', 'C', 'PMissingMorphemes')
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'C', 'D', 'PMissingMorphemes')
 
-#-- Compare conditions: Mixed (Experiment 2) (Exp2Effects)
+#-- Experiment 2
+#------------------
+
+#-- Compare conditions
 compare_conditions(sdata2, 2, 3, 'PMissingMorphemes')
 compare_conditions(sdata2, 3, 4, 'PMissingMorphemes')
 compare_conditions(sdata2, 2, 4, 'PMissingMorphemes')
@@ -120,7 +122,7 @@ compare_conditions(sdata1[as.numeric(sdata1$ItemNum) > 10, ], 'C', 'D', 'PMissin
 # Experiment 3
 #--------------------------------------------------------------------------
 
-sdata3 = load_data(paste(data_dir, 'exp3/data_coded.csv', sep='/'), nadin=TRUE)
+sdata3 = load_data(paste(data_dir, 'exp3/data_coded.csv', sep='/'))
 
 compare_conditions(sdata3, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata3, 'A', 'B', 'PMissingDigits')
@@ -130,18 +132,18 @@ compare_conditions(sdata3, 'A', 'B', 'PMissingClasses')
 # Experiment 4
 #--------------------------------------------------------------------------
 
-sdata4 = load_data(paste(data_dir, 'exp4/data_coded.csv', sep='/'), nadin=TRUE)
+sdata4 = load_data(paste(data_dir, 'exp4/data_coded.csv', sep='/'))
 
 compare_conditions(sdata4, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata4, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata4, 'A', 'B', 'PMissingClasses')
 
 #--------------------------------------------------------------------------
-# Experiment 4
+# Experiment 5
 #--------------------------------------------------------------------------
 
-sdata5 = load_data(paste(data_dir, 'exp5/data_coded.csv', sep='/'), nadin=TRUE)
+sdata5 = load_data(paste(data_dir, 'exp5/data_coded.csv', sep='/'))
 
-compare_conditions(sdata5, 'A', 'B', 'PMissingMorphemes')
+compare_conditions(sdata5, 'A', 'B', 'PMissingMorphemes', item_intercept = FALSE)
 compare_conditions(sdata5, 'A', 'B', 'PMissingDigits')
 compare_conditions(sdata5, 'A', 'B', 'PMissingClasses')
