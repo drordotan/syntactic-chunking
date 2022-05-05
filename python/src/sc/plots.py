@@ -8,6 +8,7 @@ import sc.utils
 #---------------------------------------------------------------------------
 from sc.analyze import get_value_per_subj_and_cond
 
+#---------------------------------------------------------------------------
 def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None):
     """
     Plot the mean value for each condition

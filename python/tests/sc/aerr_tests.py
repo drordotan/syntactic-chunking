@@ -5,9 +5,14 @@ from sc.markerr import *
 
 #------------------------------------------------------
 def get_n_errors(raw_target, raw_response, consider_thousand_as_digit=False):
-    target_segments, target, target_digits = analyze_target(raw_target, consider_thousand_as_digit, 0)
-    n_word_errs, n_class_errs, n_digit_errs, response_digits = \
-        analyze_response(raw_response, target, target_segments, target_digits, consider_thousand_as_digit, 0)
+    ea = ErrorAnalyzer(consider_thousand_as_digit=consider_thousand_as_digit)
+
+    target, target_segments = ea.parse_target(raw_target, 0)
+    target_word_said, target_digit_said, n_class_errs = ea.analyze_response(raw_response, target, target_segments, 0)
+
+    n_word_errs = sum([not digsaid for digsaid in target_word_said])
+    n_digit_errs = sum([digsaid is False for digsaid in target_digit_said])
+
     return n_word_errs, n_class_errs, n_digit_errs
 
 

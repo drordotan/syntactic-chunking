@@ -3,6 +3,8 @@ Mark errors in the results file
 """
 import openpyxl
 import re
+import os
+import numpy as np
 import pandas as pd
 from mtl import verbalnumbers
 
@@ -11,7 +13,8 @@ xls_copy_cols = 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPe
 xls_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'NMissingDigits', 'NMissingClasses')
 xls_out_cols = ('Subject', ) + xls_copy_cols + \
                ('NTargetDigits', 'NMissingWords', 'PMissingWords', 'NMissingDigits',
-                'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes')
+                'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes',
+                'DULMismatch', 'DURFound', 'HDRFound', 'HDRMismatch', 'DULFound', 'DURMismatch')
 
 xls_optional_cols = 'manual', 'WordOrder'
 
@@ -39,7 +42,7 @@ class ErrorAnalyzer(object):
 
 
     #------------------------------------------------------
-    def run(self, in_fn, out_dir, worksheet='data'):
+    def run(self, in_fn, out_dir=None, worksheet='data', out_fn_prefix='data_coded'):
         """
         Analyze the error rates (digit, class, morpheme, word) in each trial
 
@@ -51,16 +54,11 @@ class ErrorAnalyzer(object):
         in_ws, col_inds = self._open_input_file(in_fn, worksheet)
         out_wb, out_ws = self.create_output_workbook()
 
-        result_per_word = dict(subject=[], block=[], condition=[], itemNum=[], target=[], response=[], nTargetWords=[],
-                               wordOK=[], digitOK=[], classOK=[])
-
-        result_per_morpheme = dict(subject=[], block=[], condition=[], itemNum=[], segment_num=[], target=[], response=[],
-                                   target_segment=[], nTargetWords=[], nTargetDigits=[], nTargetMorphemes=[],
-                                   morpheme_type=[], correct=[])
+        result_per_word = []
 
         ok = True
         for rownum in range(2, in_ws.max_row+1):
-            ok = self.parse_row(in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme) and ok
+            ok = self.parse_row(in_ws, out_ws, rownum, col_inds, result_per_word) and ok
 
         if ok:
             print('{} rows were processed, no errors found.'.format(in_ws.max_row-1))
@@ -69,13 +67,17 @@ class ErrorAnalyzer(object):
 
         out_ws.freeze_panes = out_ws['A2']
         self.auto_col_width(out_ws)
-        out_wb.save(out_dir + '/data_coded.xlsx')
-        pd.DataFrame(result_per_word).to_csv(out_dir+'/data_coded_words.csv', index=False)
-        pd.DataFrame(result_per_morpheme).to_csv(out_dir+'/data_coded_morphemes.csv', index=False)
+
+        if out_dir is None:
+            print('WARNING: results were not saved for {}'.format(in_fn))
+
+        else:
+            out_wb.save(out_dir + os.sep + out_fn_prefix + '.xlsx')
+            pd.DataFrame(result_per_word).to_csv(out_dir + os.sep + out_fn_prefix + '_words.csv', index=False)
 
 
     #------------------------------------------------------
-    def parse_row(self, in_ws, out_ws, rownum, col_inds, result_per_word, result_per_morpheme):
+    def parse_row(self, in_ws, out_ws, rownum, col_inds, result_per_word):
         """
         Parse a single row, copy it to the output file
         Return True if processed OK.
@@ -84,126 +86,110 @@ class ErrorAnalyzer(object):
         """
 
         subj_id = in_ws.cell(rownum, col_inds['Subject']).value
-        block = in_ws.cell(rownum, col_inds['Block']).value
-        cond_name = in_ws.cell(rownum, col_inds['Condition']).value
-        item_num = in_ws.cell(rownum, col_inds['ItemNum']).value
         raw_target = in_ws.cell(rownum, col_inds['target']).value
         raw_response = in_ws.cell(rownum, col_inds['response']).value
         n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
         manual_coding = 'manual' in col_inds and in_ws.cell(rownum, col_inds['manual']).value in (1, '1')
-
-        if subj_id is None and raw_target is None:
-            print('Warning: row #{} seems empty, ignored'.format(rownum))
+        if manual_coding:  # todo
             return True
-
-        out_ws.cell(rownum, xls_out_cols.index('Subject')+1).value = \
-            subj_id if self.subj_id_transformer is None else self.subj_id_transformer(subj_id)
-
-        for colname in xls_copy_cols:
-            out_ws.cell(rownum, xls_out_cols.index(colname) + 1).value = in_ws.cell(rownum, col_inds[colname]).value
-
-        target_segments, target, target_digits = self.analyze_target(raw_target, rownum)
-        n_target_digits = len(target_digits)
 
         if n_target_words is None:
             print("Error in line {}: 'NWordsPerTarget' was not specified".format(rownum))
             return False
 
+        if subj_id is None and raw_target is None:
+            print('Warning: row #{} seems empty, ignored'.format(rownum))
+            return True
+
+        #-- Save basic columns
+
+        subj_id = subj_id if self.subj_id_transformer is None else self.subj_id_transformer(subj_id)
+        self._save_value(out_ws, rownum, 'Subject', subj_id)
+
+        for colname in xls_copy_cols:
+            self._save_value(out_ws, rownum, colname, in_ws.cell(rownum, col_inds[colname]).value)
+
+        #-- Analyze target & response
+
+        target, target_segments = self.parse_target(raw_target, rownum)
+
         if n_target_words != len(target):
             print("Error in line {}: Invalid number of words ({}), expecting {} words".format(rownum, len(target), n_target_words))
             return False
 
-        if manual_coding:
+        target_word_said, target_digit_said, n_class_errs = self.analyze_response(raw_response, target, target_segments, rownum)
 
-            n_word_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingWords']).value)
-            if 'WordOrder' in col_inds:
-                n_word_errs -= _nullto0(in_ws.cell(rownum, col_inds['WordOrder']).value)
+        n_word_errs = sum([not digsaid for digsaid in target_word_said])
+        n_digit_errs = sum([not digsaid for digsaid in target_digit_said])
 
-            n_digit_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingDigits']).value)
-            n_class_errs = _nullto0(in_ws.cell(rownum, col_inds['NMissingClasses']).value)
-            response_digits = ()
+        #-- Save performance measures
 
-        else:
-            n_word_errs, n_class_errs, n_digit_errs, response_digits = \
-                self.analyze_response(raw_response, target, target_segments, target_digits, rownum)
-            if n_word_errs is None:  # Error
-                return False
+        n_target_digits = sum([t.digit is not None for t in target])
 
-        self._save_value(out_ws, rownum, 'NTargetDigits', n_target_digits)
         self._save_value(out_ws, rownum, 'NMissingWords', n_word_errs)
         self._save_value(out_ws, rownum, 'NMissingDigits', n_digit_errs)
         self._save_value(out_ws, rownum, 'NMissingClasses', n_class_errs)
+
+        self._save_value(out_ws, rownum, 'NTargetDigits', n_target_digits)
         self._save_value(out_ws, rownum, 'PMissingWords', n_word_errs / n_target_words)
         self._save_value(out_ws, rownum, 'PMissingDigits', n_digit_errs / n_target_digits)
         self._save_value(out_ws, rownum, 'PMissingClasses', n_class_errs / n_target_words)
         self._save_value(out_ws, rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
 
-        if manual_coding and self.accuracy_per_digit:
-            print('WARNING: line {} excluded from the per-word analyses because it was coded manually'.format(rownum))
-            return True
-
-        for i in range(n_target_words):
-            result_per_word['subject'].append(subj_id)
-            result_per_word['block'].append(block)
-            result_per_word['condition'].append(cond_name)
-            result_per_word['itemNum'].append(item_num)
-            result_per_word['target'].append(raw_target)
-            result_per_word['response'].append(raw_response)
-            result_per_word['nTargetWords'].append(n_target_words)
-            result_per_word['wordOK'].append(1 if i >= n_word_errs else 0)
-            result_per_word['digitOK'].append(1 if i >= n_digit_errs else 0)
-            result_per_word['classOK'].append(1 if i >= n_class_errs else 0)
-
-            result_per_morpheme['subject'].append(subj_id)
-            result_per_morpheme['block'].append(block)
-            result_per_morpheme['condition'].append(cond_name)
-            result_per_morpheme['itemNum'].append(item_num)
-            result_per_morpheme['segment_num'].append('')
-            result_per_morpheme['target'].append(raw_target)
-            result_per_morpheme['target_segment'].append('')
-            result_per_morpheme['response'].append(raw_response)
-            result_per_morpheme['nTargetWords'].append(n_target_words)
-            result_per_morpheme['nTargetDigits'].append(n_target_digits)
-            result_per_morpheme['nTargetMorphemes'].append(n_target_words + n_target_digits)
-            result_per_morpheme['morpheme_type'].append('class')
-            result_per_morpheme['correct'].append(1 if i >= n_class_errs else 0)
-
-        for i in range(n_target_digits):
-            result_per_morpheme['subject'].append(subj_id)
-            result_per_morpheme['block'].append(block)
-            result_per_morpheme['condition'].append(cond_name)
-            result_per_morpheme['itemNum'].append(item_num)
-            result_per_morpheme['segment_num'].append(i+1 if self.accuracy_per_digit else '')
-            result_per_morpheme['target'].append(raw_target)
-            result_per_morpheme['target_segment'].append(target_digits[i] if self.accuracy_per_digit else '')
-            result_per_morpheme['response'].append(raw_response)
-            result_per_morpheme['nTargetWords'].append(n_target_words)
-            result_per_morpheme['nTargetDigits'].append(n_target_digits)
-            result_per_morpheme['nTargetMorphemes'].append(n_target_words + n_target_digits)
-            result_per_morpheme['morpheme_type'].append('digit')
-
-            if self.accuracy_per_digit:
-                correct = target_digits[i] in response_digits
-            else:
-                correct = 1 if i >= n_digit_errs else 0
-
-            result_per_morpheme['correct'].append(correct)
+        self._save_accuracy_per_word(subj_id, in_ws, rownum, col_inds, target, target_word_said, target_digit_said, raw_response, raw_target,
+                                     result_per_word)
 
         return True
 
 
-    #------------------------------------------------------
-    def analyze_target(self, raw_target, rownum):
+    #------------------------------------------------------------------------------
+    def parse_target(self, raw_target, rownum):
         target_segments = self.parse_target_or_response(raw_target, rownum)
-        target = self.collapse_segments(target_segments)
+        target = np.array(self.collapse_segments(target_segments)[::-1])  # put the ones word in position 1
+        return target, target_segments
 
-        target_digits = [t.digit for t in target if t.digit is not None][::-1]  # put the ones word in position 1
 
-        return target_segments, target, target_digits
+    #------------------------------------------------------------------------------
+    def _save_accuracy_per_word(self, subj_id, in_ws, rownum, col_inds, target, target_word_said, target_digit_said,
+                                raw_response, raw_target, result_per_word):
+
+        block = in_ws.cell(rownum, col_inds['Block']).value
+        cond_name = in_ws.cell(rownum, col_inds['Condition']).value
+        item_num = in_ws.cell(rownum, col_inds['ItemNum']).value
+        n_target_words = len(target_word_said)
+
+        for i, (word_said, digit_said, target_word) in enumerate(zip(target_word_said, target_digit_said, target)):
+            r = dict(subject=subj_id,
+                     block=block,
+                     condition=cond_name,
+                     item_num=item_num,
+                     n_target_words=n_target_words,
+                     target=raw_target,
+                     response=raw_response,
+                     word_order=n_target_words-i,
+                     target_word=target_word,
+                     word_ok=1 if word_said else 0,
+                     digit_ok=None if digit_said is None else 1 if digit_said else 0,
+                     )
+
+            result_per_word.append(r)
 
 
     #------------------------------------------------------
-    def analyze_response(self, raw_response, target, target_segments, target_digits, rownum):
+    def analyze_response(self, raw_response, target, target_segments, rownum):
+        """
+        Analyze the target-response matching and save the results onto the Excel worksheet
+
+        Returns:
+        - a bool array with one entry per target word, indicating whether that word was said
+        - a bool array with one entry per target word, indicating whether the word's digit was said (None if the target word has no digit)
+        - The number of unsaid target classes
+
+        :param raw_response: The response as a string
+        :param target:
+        :param target_segments:
+        :param rownum:
+        """
 
         response_segments = self.parse_response(raw_response, rownum, target_segments)
         if target_segments is None or response_segments is None:
@@ -211,13 +197,29 @@ class ErrorAnalyzer(object):
 
         response = self.collapse_segments(response_segments)
 
-        n_word_errs = self.n_missing_target_items(target, response)
-        n_class_errs = self._n_missing_classes(target, response)
+        target_word_said = self.target_items_said(target, response)
 
         response_digits = [r.digit for r in response if r.digit is not None]
-        n_digit_errs = self.n_missing_target_items(target_digits, response_digits)
+        target_digit_said = self.target_items_said([t.digit for t in target], response_digits)
+        for i, t in enumerate(target):
+            if t.digit is None:
+                target_digit_said[i] = None
 
-        return n_word_errs, n_class_errs, n_digit_errs, response_digits
+        n_unsaid_target_classes = self._n_missing_classes(target, response)
+
+        """
+        n_du_r, n_du_r_breaks = self.n_pairs(target, response, -2)
+        n_hd, n_hd_breaks = self.n_pairs(target, response, -3)
+        self._save_value(out_ws, rownum, 'HDRFound', n_hd)
+        self._save_value(out_ws, rownum, 'HDRMismatch', n_hd_breaks)
+        self._save_value(out_ws, rownum, 'DURFound', n_du_r)
+        self._save_value(out_ws, rownum, 'DURMismatch', n_du_r_breaks)
+        if len(target) > 4:
+            n_du_l, n_du_l_breaks = self.n_pairs(target, response, -5)
+            self._save_value(out_ws, rownum, 'DULFound', n_du_l)
+            self._save_value(out_ws, rownum, 'DULMismatch', n_du_l_breaks)
+        """
+        return target_word_said, target_digit_said, n_unsaid_target_classes
 
 
     #------------------------------------------------------
@@ -238,15 +240,52 @@ class ErrorAnalyzer(object):
 
 
     #------------------------------------------------------
-    def n_missing_target_items(self, target_items, response_items):
-        # No. of target items that are not in the response
+    def target_items_said(self, target_items, response_items):
+        """ Return an array of bool: for each target item, whether it was said or not """
 
-        tmp = list(target_items)
+        trg = list(target_items)
         for r in response_items:
-            if r in tmp:
-                tmp.remove(r)
+            if r is None:
+                continue
+            try:
+                trg[trg.index(r)] = None
+            except ValueError:
+                #-- "r" is not in "tmp"
+                pass
 
-        return len(tmp)
+        target_item_said = [t is None for t in trg]
+
+        return target_item_said
+
+
+    #------------------------------------------------------
+    def n_pairs(self, target, response, tind):
+        """
+        Find adjacent words with (class1, class2), and check if they appeared as an adjacent pair in the response
+
+        Return:
+        n_pairs_found - the number of pairs that existed in the target and the response
+        n_mismatching_order - the number of pairs that existed in the target, and in the response existed with position violation (= not adjacent,
+                              or not in the same order).
+
+        :param class1:
+        :param class2:
+        :param target: list of words
+        :param response: list of words
+        """
+        ### target_inds = [i for i, (t1, t2) in enumerate(zip(target[:-1], target[1:])) if t1.lexical_class == class1 and t2.lexical_class == class2]
+
+        word1 = target[tind]
+        word2 = target[tind+1]
+
+        if word1 not in response or word2 not in response:
+            return 0, 0
+
+        correct_order_inds = [i for i, (r1, r2) in enumerate(zip(response[:-1], response[1:])) if r1 == word1 and r2 == word2]
+
+        n_mismatching_order = int(len(correct_order_inds) == 0)
+
+        return 1, n_mismatching_order
 
 
     #------------------------------------------------------
@@ -255,7 +294,7 @@ class ErrorAnalyzer(object):
         if response_str is None:
             return None
 
-        if response_str in ('+', '!'):
+        if response_str in ('+', '!', 'v', 'V'):
             return target_segments
 
         if response_str == '-':
@@ -382,7 +421,6 @@ class ErrorAnalyzer(object):
         result = verbalnumbers.hebrew.number_to_words(segment, digit_mapping=self._digit_mapping)
 
         if not self.consider_thousand_as_digit:
-            #todo this fix should be in the code
             one_thousand = verbalnumbers.general.NumberWord(verbalnumbers.hebrew.thousands, 1)
             decimal_word_thousand = verbalnumbers.general.NumberWord(verbalnumbers.hebrew.decword_thousand, None)
             for i, w in enumerate(result):
