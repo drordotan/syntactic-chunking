@@ -8,21 +8,6 @@ load_data <- function(filename, useNErrExcludingOrder=FALSE) {
 }
 
 #--------------------------------------------------------------------------------------------------
-load_morphemes <- function(filename) {
-  df_words = read.csv(filename)
-  
-  result = df_words
-  result$morphemeOK = result$digitOK
-  result$morphemeType = 'digit'
-
-  result2 = df_words
-  result2$morphemeOK = result2$classOK
-  result2$morphemeType = 'class'
-  
-  return (rbind(result, result2))
-}
-
-#--------------------------------------------------------------------------------------------------
 compare_conditions <- function(sdata, cond1, cond2, dependent_var, item_intercept=TRUE, logistic=FALSE) {
   
   sdata = sdata[sdata$Condition %in% c(cond1, cond2),]
@@ -73,44 +58,6 @@ compare_conditions_w <- function(sdata, cond1, cond2, dependent_var, item_interc
   
   print_model_coefs(mdl1, '@cond2')
 }
-
-#--------------------------------------------------------------------------------------------------
-# Morphological comparison
-compare_conditions_morphemes <- function(sdata, cond1, cond2, morpheme_type=NA, item_intercept=TRUE) {
-  
-  sdata = sdata[sdata$condition %in% c(cond1, cond2),]
-  sdata$cond2 = sdata$condition %in% cond2
-  
-  if (is.na(morpheme_type)) {
-    target_length_factor = 'nTargetMorphemes'
-    morpheme_type_factor = 'morpheme_type + '
-  } else if (morpheme_type == 'digit') {
-    target_length_factor = 'nTargetDigits'
-    morpheme_type_factor = ''
-    sdata = sdata[sdata$morpheme_type==morpheme_type,]
-  } else if (morpheme_type == 'class') {
-    target_length_factor = 'nTargetWords'
-    morpheme_type_factor = ''
-    sdata = sdata[sdata$morpheme_type==morpheme_type,]
-  } else {
-    stop('Invalid morpheme type')
-  }
-  
-  item_intercept_factor = ifelse(item_intercept, ' + (1|itemNum)', '')
-  
-  formula1 = sprintf('correct ~ cond2 + %s + %s(1|subject)%s', target_length_factor, morpheme_type_factor, item_intercept_factor)
-  formula0 = sprintf('correct ~ %s + %s(1|subject)%s', target_length_factor, morpheme_type_factor, item_intercept_factor)
-  
-  mdl1 = glmer(as.formula(formula1), data = sdata, family=binomial)
-  mdl0 = glmer(as.formula(formula0), data = sdata, family=binomial)
-  
-  cond1name = paste(cond1, collapse=",")
-  cond2name = paste(cond2, collapse=",")
-  compare_models(mdl0, mdl1, sprintf('condition %s (%d items) vs %s  (%d items)', cond1name, sum(!sdata$cond2), cond2name, sum(sdata$cond2)))
-  
-  print_model_coefs(mdl1, '@cond2')
-}
-
 
 #--------------------------------------------------------------------------------------------------
 # Subject-level analysis (run for all subjects)
@@ -211,3 +158,28 @@ item_num_effect <- function(sdata, dependent_var) {
   
   print_model_coefs(mdl1, '#ItemNum')
 }
+
+
+#--------------------------------------------------------------------------------------------------
+#-- Interaction between position (hundreds vs. thousands) and condition (A,B vs. D)
+pos_cond_interaction <- function(sdata, target_condition='D') {
+  
+  sdata = sdata[!is.na(sdata$digit_ok) & sdata$n_target_words == 6,]
+  sdata$condD = sdata$condition == target_condition
+  
+  sdata$position = NA
+  
+  for (cond in unique(sdata$condition)) {
+    word_orders = sort(unique(sdata$word_order[sdata$condition == cond]))
+    sdata$position[sdata$condition == cond] <- mapvalues(sdata$word_order[sdata$condition == cond], from=word_orders, to=1:length(word_orders))
+  }
+  
+  sdata <- sdata[sdata$position %in% c(2,3),]
+  
+  mdl1 = glmer(digit_ok ~ condD * position + (1|item_num) + (1|subject), data=sdata, family=binomial)
+  mdl0 = glmer(digit_ok ~ condD + position + (1|item_num) + (1|subject), data=sdata, family=binomial)
+
+  compare_models(mdl0, mdl1, 'condition-position interaction')
+  print_model_coefs(mdl1, 'condDTRUE:position')
+}
+

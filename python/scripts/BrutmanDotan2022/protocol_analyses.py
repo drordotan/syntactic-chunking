@@ -7,8 +7,8 @@ import matplotlib as mpl
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['ps.fonttype'] = 42
 
-d = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/data/'
-fig_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/figures/'
+d = '/Users/dror/data/acad-proj/3-Submitted/syntactic chunking Nadin/data/'
+fig_dir = '/Users/dror/data/acad-proj/3-Submitted/syntactic chunking Nadin/figures/'
 
 RED = '#BF5860'
 GREENS = ('#455C41', '#62845C', '#79A472', '#A2D49A')

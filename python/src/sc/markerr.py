@@ -197,28 +197,10 @@ class ErrorAnalyzer(object):
 
         response = self.collapse_segments(response_segments)
 
-        target_word_said = self.target_items_said(target, response)
-
-        response_digits = [r.digit for r in response if r.digit is not None]
-        target_digit_said = self.target_items_said([t.digit for t in target], response_digits)
-        for i, t in enumerate(target):
-            if t.digit is None:
-                target_digit_said[i] = None
+        target_word_said, target_digit_said = self.target_items_said(target, response)
 
         n_unsaid_target_classes = self._n_missing_classes(target, response)
 
-        """
-        n_du_r, n_du_r_breaks = self.n_pairs(target, response, -2)
-        n_hd, n_hd_breaks = self.n_pairs(target, response, -3)
-        self._save_value(out_ws, rownum, 'HDRFound', n_hd)
-        self._save_value(out_ws, rownum, 'HDRMismatch', n_hd_breaks)
-        self._save_value(out_ws, rownum, 'DURFound', n_du_r)
-        self._save_value(out_ws, rownum, 'DURMismatch', n_du_r_breaks)
-        if len(target) > 4:
-            n_du_l, n_du_l_breaks = self.n_pairs(target, response, -5)
-            self._save_value(out_ws, rownum, 'DULFound', n_du_l)
-            self._save_value(out_ws, rownum, 'DULMismatch', n_du_l_breaks)
-        """
         return target_word_said, target_digit_said, n_unsaid_target_classes
 
 
@@ -240,22 +222,47 @@ class ErrorAnalyzer(object):
 
 
     #------------------------------------------------------
-    def target_items_said(self, target_items, response_items):
+    def target_items_said(self, target_words, response_words):
         """ Return an array of bool: for each target item, whether it was said or not """
 
-        trg = list(target_items)
-        for r in response_items:
-            if r is None:
+        #---- Step 1: fully-correct words
+
+        tmp_target_words = list(target_words)
+        response_words = list(response_words)
+
+        #-- Loop through response, mark each said word
+        for i, resp in enumerate(response_words):
+            if resp is None:
                 continue
+
             try:
-                trg[trg.index(r)] = None
+                tmp_target_words[tmp_target_words.index(resp)] = None
+                response_words[i] = None
             except ValueError:
-                #-- "r" is not in "tmp"
+                #-- Exception from target_words.index() - i.e., response word was not said
                 pass
 
-        target_item_said = [t is None for t in trg]
+        target_word_said = [t is None for t in tmp_target_words]
 
-        return target_item_said
+        #---- Step 2: digits said with incorrect class
+
+        target_digit_said = list(target_word_said)
+        for i, t in enumerate(target_words):
+            if t.digit is None:
+                target_digit_said[i] = None
+
+        remaining_target_digit_inds = {t.digit: i for i, t in enumerate(tmp_target_words) if t is not None and t.digit is not None}
+        remaining_response_digits = [r.digit for r in response_words if r is not None and r.digit is not None]
+
+        #-- Loop through response, mark each said digit
+        for i, resp in enumerate(remaining_response_digits):
+            if resp in remaining_target_digit_inds:
+                trg_ind = remaining_target_digit_inds[resp]
+                del remaining_target_digit_inds[resp]
+                target_digit_said[trg_ind] = True
+                tmp_target_words[trg_ind] = None
+
+        return target_word_said, target_digit_said
 
 
     #------------------------------------------------------
@@ -268,12 +275,10 @@ class ErrorAnalyzer(object):
         n_mismatching_order - the number of pairs that existed in the target, and in the response existed with position violation (= not adjacent,
                               or not in the same order).
 
-        :param class1:
-        :param class2:
         :param target: list of words
         :param response: list of words
+        :param tind: The index of the relevant target word
         """
-        ### target_inds = [i for i, (t1, t2) in enumerate(zip(target[:-1], target[1:])) if t1.lexical_class == class1 and t2.lexical_class == class2]
 
         word1 = target[tind]
         word2 = target[tind+1]

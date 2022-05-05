@@ -144,12 +144,7 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
     else:
         ax.set_xticks([])
 
-    y_ticks = np.arange(0, ymax+.0001, dy)
-    ax.set_yticks(y_ticks)
-    y_labels = ['{:.0f}%'.format(y*100) for y in y_ticks]
-    if visible_y_labels is not None:
-        y_labels = [y if i % visible_y_labels == 0 else '' for i, y in enumerate(y_labels)]
-    ax.set_yticklabels(y_labels, fontsize=font_size)
+    set_yticks(ax, dy, font_size, visible_y_labels)
 
     ax.grid(axis='y', color=[0.9]*3, linewidth=0.5, zorder=0)
 
@@ -158,6 +153,21 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
 
     ax.tick_params('x', length=0, width=0)
     ax.tick_params('y', length=0, width=0)
+
+
+#---------------------------------------------------------------------------
+def set_yticks(ax, dy, font_size=None, visible_y_labels=None, ymin=0):
+
+    ymax = plt.ylim()[1]
+
+    y_ticks = np.arange(ymin, ymax+.0001, dy)
+    ax.set_yticks(y_ticks)
+
+    y_labels = ['{:.0f}%'.format(y*100) for y in y_ticks]
+    if visible_y_labels is not None:
+        y_labels = [y if i%visible_y_labels == 0 else '' for i, y in enumerate(y_labels)]
+
+    ax.set_yticklabels(y_labels, fontsize=font_size)
 
 
 #---------------------------------------------------------------------------
@@ -243,6 +253,9 @@ def plot_cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fi
 
 #---------------------------------------------------------------------------
 def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, ymax, dy, colors, font_size):
+    """
+    Plot a group of subjects as one figure (one panel)
+    """
 
     for i_subj, subj in enumerate(subj_ids):
         subj_df = df[df.Subject == subj]
@@ -253,3 +266,63 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
     _format_conds_graph(ax, conditions, dy, len(conditions), ymax, font_size=font_size, cond_names=cond_names)
     ax.legend([str(s) for s in subj_ids], fontsize=5)
 
+
+#---------------------------------------------------------------------------
+def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=None, cond_names=None, dec_pos_names=None, ylim=(0, 1),
+                                     d_y_ticks=None, font_size=None, fig_size=None):
+
+    if dec_pos_names is None:
+        dec_pos_names = ('Ones', 'Tens', 'Hundreds', 'Thousands', 'Myriads', 'HThousand')
+
+    if len(df.n_target_words.unique()) > 1:
+        raise ValueError('ERROR: the data contains stimuli of different lengths')
+
+    n_target_words = df.n_target_words[0]
+    dec_pos_names = dec_pos_names[:(n_target_words-1)][::-1]
+
+    x = list(range(n_target_words - 1))
+
+    df = df[~df.digit_ok.isnull()]
+
+    if conditions is None:
+        conditions = sorted(df.condition.unique())
+
+    if cond_names is None:
+        cond_names = conditions
+
+    plt.clf()
+    fig = plt.figure(figsize=fig_size)
+
+    for i_cond, cond in enumerate(conditions):
+        cdf = df[df.condition == cond]
+
+        positions = sorted(cdf.word_order.unique())
+        assert len(positions) == n_target_words - 1
+
+        y = [1 - cdf.digit_ok[cdf.word_order == pos].mean() for pos in positions]
+
+        color = None if colors is None else colors[i_cond]
+        plt.plot(x, y, color=color, marker='o')
+
+    plt.legend(cond_names)
+
+    ax = plt.gca()
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(dec_pos_names)
+
+    plt.ylim(ylim)
+    if d_y_ticks is not None:
+        set_yticks(ax, d_y_ticks, font_size, ymin=plt.ylim()[0])
+
+    ax.grid(axis='y', color=[0.9]*3, linewidth=0.5, zorder=0)
+    plt.ylabel('Errors', fontsize=font_size)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.tick_params('x', length=0, width=0)
+    ax.tick_params('y', length=0, width=0)
+
+    if save_as is not None:
+        fig.savefig(save_as)

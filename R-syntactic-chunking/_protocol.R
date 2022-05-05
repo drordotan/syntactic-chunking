@@ -8,8 +8,8 @@ library(effects)
 library(gdata)
 library(sjPlot)
 
-scripts_dir = '/Users/dror/git/syntactic-chunking/R'
-data_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/data'
+scripts_dir = '/Users/dror/git/syntactic-chunking/R-syntactic-chunking'
+data_dir = '/Users/dror/data/acad-proj/3-Submitted/syntactic chunking Nadin/data'
 
 source(paste(scripts_dir, 'utils.R', sep='/'))
 source(paste(scripts_dir, 'sc_basic.R', sep='/'))
@@ -26,23 +26,12 @@ sdata2 = sdata12[sdata12$Block == 'R',]
 sdata1_all = sdata1
 sdata1_all$Condition[sdata1_all$Block == 'R'] = 'R'
 
-#-- Each data point = 1 word
+#-- Each data point = 1 digit
 sdata1w = read.csv(paste(data_dir, 'exp1&2/data_coded_words.csv', sep='/'))
-sdata2w = sdata1w[sdata1w$block == 'R',]
-sdata1w = sdata1w[sdata1w$block != 'R',]
-
-#-- Each data point = 1 morpheme
-sdata1m = read.csv(paste(data_dir, 'exp1&2/data_coded_morphemes.csv', sep='/'))
-sdata2m = sdata1m[sdata1m$block == 'R',]
-sdata1m = sdata1m[sdata1m$block != 'R',]
-
+sdata1w = sdata1w[sdata1w$condition %in% c('A', 'B', 'D'),]
 
 #-- Experiment 1
 #------------------
-
-compare_conditions_logistic(sdata1w, 'A', 'B', 'wordOK')
-compare_conditions_morphemes(sdata1m, 'A', 'B', morpheme_type = 'digit')
-
 
 compare_conditions(sdata1, 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata1, 'B', 'C', 'PMissingMorphemes')
@@ -72,6 +61,10 @@ cat('\nAnalysis of 5-digit numbers:\n')
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'A', 'B', 'PMissingMorphemes')
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'B', 'C', 'PMissingMorphemes')
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'C', 'D', 'PMissingMorphemes')
+
+#-- Interaction between position (hundreds vs. thousands) and condition (A,B vs. D)
+pos_cond_interaction(sdata1w)
+pos_cond_interaction(sdata1w[sdata1w$condition %in% c('A', 'B'),], target_condition = 'A')
 
 #-- Experiment 2
 #------------------

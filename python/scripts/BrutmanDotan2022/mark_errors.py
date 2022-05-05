@@ -1,7 +1,7 @@
 import sc
 import sc.utils as u
 
-base_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking Nadin/data/'
+base_dir = '/Users/dror/data/acad-proj/3-Submitted/syntactic chunking Nadin/data/'
 
 
 analyzer_12 = sc.markerr.ErrorAnalyzer(subj_id_transformer=u.clean_subj_id, consider_thousand_as_digit=False, accuracy_per_digit=True)
