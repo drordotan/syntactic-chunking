@@ -28,30 +28,20 @@ exp2 = exp12[exp12.Condition.isin(range(10))]
 
 #-- Blocked (PStat:FigExp1BlockedConds)
 sc.plots.plot_cond_means_multiple_measures(exp1, dependent_vars=['PMissingMorphemes', 'PMissingDigits', 'PMissingClasses'],
-                                           out_fn=fig_dir+'exp1_cond_mean_all.pdf', ymax=0.3, d_y_ticks=.05, fig_size=(6, 2),
+                                           out_fn=fig_dir+'exp1_cond_mean_all.pdf', ymax=0.28, d_y_ticks=.05, fig_size=(6, 2),
                                            cond_names=dict(A='A (grammatical)', B='B', C='C', D='D (fragmented)'), conditions=('A', 'B', 'C', 'D'),
                                            dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=GREENS, font_size=8)
 
 #-- Per subject (PStat:FigExp1PerSubj)
-
-#sc.analyze.exp1_auto_group_subjects(exp1_blocked, 'PMissingWords')
 subj_grouping = [
     (12, 13, 17, 19),
     (6, 15, 16, 20),
     (2, 10, 11),
-    (3, 7, 8, 18),
-    (1, 4, 5, 14),
-    (9, ),
+    (3, 7, 8),
+    (1, 4, 5, 8),
+    (9, 14, 18),
 ]
-
-
 sc.plots.plot_cond_means_per_subject(exp1, 'PMissingMorphemes', fig_dir+'exp1_per_subj_morph.pdf', ymax=0.42, fig_size=(6, 6),
-                                     subj_grouping=subj_grouping, y_label='Morpheme error rate')
-
-sc.plots.plot_cond_means_per_subject(exp1, 'PMissingDigits', fig_dir+'exp1_per_subj_digit.pdf', ymax=0.42, fig_size=(6, 6),
-                                     subj_grouping=subj_grouping, y_label='Morpheme error rate')
-
-sc.plots.plot_cond_means_per_subject(exp1, 'PMissingClasses', fig_dir+'exp1_per_subj_class.pdf', ymax=0.42, fig_size=(6, 6),
                                      subj_grouping=subj_grouping, y_label='Morpheme error rate')
 
 #-- Compare % of specific items that are better in each condition (PStat:Exp1ComparePerItem)

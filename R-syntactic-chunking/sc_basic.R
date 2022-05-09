@@ -8,7 +8,7 @@ load_data <- function(filename, useNErrExcludingOrder=FALSE) {
 }
 
 #--------------------------------------------------------------------------------------------------
-compare_conditions <- function(sdata, cond1, cond2, dependent_var, item_intercept=TRUE, logistic=FALSE) {
+compare_conditions <- function(sdata, cond1, cond2, dependent_var, item_intercept=TRUE, logistic=FALSE, save.full.model=NA, models_dir=NA) {
   
   sdata = sdata[sdata$Condition %in% c(cond1, cond2),]
   sdata$cond2 = sdata$Condition %in% cond2
@@ -36,6 +36,15 @@ compare_conditions <- function(sdata, cond1, cond2, dependent_var, item_intercep
   compare_models(mdl0, mdl1, sprintf('condition %s (%d items) vs %s  (%d items)', cond1name, sum(!sdata$cond2), cond2name, sum(sdata$cond2)))
   
   print_model_coefs(mdl1, '@cond2')
+  
+  if (! is.na(save.full.model)) {
+    save_model_coefs(mdl1, save.full.model, models_dir)
+  }
+  
+  #r2.1 = r.squaredGLMM(mdl1)[1]
+  #r2.0 = r.squaredGLMM(mdl0)[1]
+  #effect_size = (r2.1 - r2.0) / (1 - r2.1)
+  #print(sprintf('Effect size: %.3f', effect_size))
 }
 
 #--------------------------------------------------------------------------------------------------
@@ -183,3 +192,29 @@ pos_cond_interaction <- function(sdata, target_condition='D') {
   print_model_coefs(mdl1, 'condDTRUE:position')
 }
 
+#--------------------------------------------------------------------------------------------------
+#-- Effect of position in one conditions
+pos_effect <- function(sdata, positions) {
+  
+  sdata = sdata[!is.na(sdata$digit_ok) & sdata$n_target_words == 6,]
+
+  sdata$position = NA
+  
+  word_orders = sort(unique(sdata$word_order))
+  sdata$position <- mapvalues(sdata$word_order, from=word_orders, to=1:length(word_orders))
+  
+  sdata <- sdata[sdata$position %in% positions,]
+  
+  mdl1 = glmer(digit_ok ~ position + (1|item_num) + (1|subject), data=sdata, family=binomial)
+  mdl0 = glmer(digit_ok ~ (1|item_num) + (1|subject), data=sdata, family=binomial)
+  
+  compare_models(mdl0, mdl1, 'position')
+  print_model_coefs(mdl1, 'position')
+}
+
+
+#--------------------------------------------------------------------------------------------------
+save_model_coefs <- function(mdl, filename, models_dir) {
+  print(sprintf('Saved to %s/%s.html', models_dir, filename))
+  tab_model(mdl, file=sprintf('%s/%s.html', models_dir, filename), show.p=FALSE, show.icc=FALSE, show.obs=FALSE, show.ngroups=FALSE)
+}

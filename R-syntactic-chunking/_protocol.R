@@ -7,9 +7,11 @@ library(stringr)
 library(effects)
 library(gdata)
 library(sjPlot)
+library(plyr)
 
 scripts_dir = '/Users/dror/git/syntactic-chunking/R-syntactic-chunking'
 data_dir = '/Users/dror/data/acad-proj/3-Submitted/syntactic chunking Nadin/data'
+models_dir = '/Users/dror/data/acad-proj/3-Submitted/syntactic chunking Nadin/figures/models'
 
 source(paste(scripts_dir, 'utils.R', sep='/'))
 source(paste(scripts_dir, 'sc_basic.R', sep='/'))
@@ -33,23 +35,22 @@ sdata1w = sdata1w[sdata1w$condition %in% c('A', 'B', 'D'),]
 #-- Experiment 1
 #------------------
 
-compare_conditions(sdata1, 'A', 'B', 'PMissingMorphemes')
-compare_conditions(sdata1, 'B', 'C', 'PMissingMorphemes')
-compare_conditions(sdata1, 'C', 'D', 'PMissingMorphemes')
+compare_conditions(sdata1, 'A', 'B', 'PMissingMorphemes', save.full.model='exp1_morph_AB', models_dir=models_dir)
+compare_conditions(sdata1, 'B', 'C', 'PMissingMorphemes', save.full.model='exp1_morph_BC', models_dir=models_dir)
+compare_conditions(sdata1, 'C', 'D', 'PMissingMorphemes', save.full.model='exp1_morph_CD', models_dir=models_dir)
 
-compare_conditions(sdata1, 'A', 'B', 'PMissingDigits')
-compare_conditions(sdata1, 'B', 'C', 'PMissingDigits')
-compare_conditions(sdata1, 'C', 'D', 'PMissingDigits')
+compare_conditions(sdata1, 'A', 'B', 'PMissingDigits', save.full.model='exp1_digits_AB', models_dir=models_dir)
+compare_conditions(sdata1, 'B', 'C', 'PMissingDigits', save.full.model='exp1_digits_BC', models_dir=models_dir)
+compare_conditions(sdata1, 'C', 'D', 'PMissingDigits', save.full.model='exp1_digits_CD', models_dir=models_dir)
 
-compare_conditions(sdata1, 'A', 'B', 'PMissingClasses')
-compare_conditions(sdata1, 'B', 'C', 'PMissingClasses')
-compare_conditions(sdata1, 'C', 'D', 'PMissingClasses')
+compare_conditions(sdata1, 'A', 'B', 'PMissingClasses', save.full.model='exp1_class_AB', models_dir=models_dir)
+compare_conditions(sdata1, 'B', 'C', 'PMissingClasses', save.full.model='exp1_class_BC', models_dir=models_dir)
+compare_conditions(sdata1, 'C', 'D', 'PMissingClasses', save.full.model='exp1_class_CD', models_dir=models_dir)
 
 compare_conditions(sdata1, 'A', 'B', 'PMissingWords')
 compare_conditions(sdata1, 'B', 'C', 'PMissingWords')
 compare_conditions(sdata1, 'C', 'D', 'PMissingWords')
 
-compare_conditions_logistic_per_subj(sdata1, 'B', 'D', 'wordOK')
 
 #-- Compare 5-digit and 6-digit separately
 cat(sprintf('\nAnalysis of 6-digit numbers (%d subjects):\n', length(unique(sdata1$Subject[sdata1$NWordsPerTarget == 7]))))
@@ -65,6 +66,9 @@ compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'C', 'D', 'PMissingMorp
 #-- Interaction between position (hundreds vs. thousands) and condition (A,B vs. D)
 pos_cond_interaction(sdata1w)
 pos_cond_interaction(sdata1w[sdata1w$condition %in% c('A', 'B'),], target_condition = 'A')
+
+# In condition D, the small difference between the first 2 conditions is not significant:
+pos_effect(sdata1w[sdata1w$condition == 'D',], c(1, 2))
 
 #-- Experiment 2
 #------------------

@@ -16,14 +16,13 @@ xls_out_cols = ('Subject', ) + xls_copy_cols + \
                 'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes',
                 'DULMismatch', 'DURFound', 'HDRFound', 'HDRMismatch', 'DULFound', 'DURMismatch')
 
-xls_optional_cols = 'manual', 'WordOrder'
-
 
 # noinspection PyMethodMayBeStatic
 class ErrorAnalyzer(object):
 
     #------------------------------------------------------
-    def __init__(self, digit_mapping=None, subj_id_transformer=None, consider_thousand_as_digit=True, accuracy_per_digit=False):
+    def __init__(self, digit_mapping=None, subj_id_transformer=None, consider_thousand_as_digit=True, accuracy_per_digit=False,
+                 fail_on_segment_order_error=False):
         """
 
         :param digit_mapping:
@@ -39,6 +38,7 @@ class ErrorAnalyzer(object):
         self.subj_id_transformer = subj_id_transformer
         self.consider_thousand_as_digit = consider_thousand_as_digit
         self.accuracy_per_digit = accuracy_per_digit
+        self.fail_on_segment_order_error = fail_on_segment_order_error
 
 
     #------------------------------------------------------
@@ -49,6 +49,7 @@ class ErrorAnalyzer(object):
         :param in_fn: Excel file with the raw data (uncoded)
         :param worksheet: Name of worksheet to read
         :param out_dir: Directory for output files
+        :param out_fn_prefix:
         """
 
         in_ws, col_inds = self._open_input_file(in_fn, worksheet)
@@ -63,7 +64,7 @@ class ErrorAnalyzer(object):
         if ok:
             print('{} rows were processed, no errors found.'.format(in_ws.max_row-1))
         else:
-            print('Some errors were encountered. Set 1 in the "manual" column to override automatic error encoding.')
+            print('Some errors were encountered.')
 
         out_ws.freeze_panes = out_ws['A2']
         self.auto_col_width(out_ws)
@@ -81,17 +82,12 @@ class ErrorAnalyzer(object):
         """
         Parse a single row, copy it to the output file
         Return True if processed OK.
-
-        If the value in the "manual" column is 1, don't do anything - just copy the error rates from the corresponding columns
         """
 
         subj_id = in_ws.cell(rownum, col_inds['Subject']).value
         raw_target = in_ws.cell(rownum, col_inds['target']).value
         raw_response = in_ws.cell(rownum, col_inds['response']).value
         n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
-        manual_coding = 'manual' in col_inds and in_ws.cell(rownum, col_inds['manual']).value in (1, '1')
-        if manual_coding:  # todo
-            return True
 
         if n_target_words is None:
             print("Error in line {}: 'NWordsPerTarget' was not specified".format(rownum))
@@ -118,9 +114,11 @@ class ErrorAnalyzer(object):
             return False
 
         target_word_said, target_digit_said, n_class_errs = self.analyze_response(raw_response, target, target_segments, rownum)
+        if target_word_said is None:
+            return False
 
-        n_word_errs = sum([not digsaid for digsaid in target_word_said])
-        n_digit_errs = sum([not digsaid for digsaid in target_digit_said])
+        n_word_errs = sum([digsaid is False for digsaid in target_word_said])
+        n_digit_errs = sum([digsaid is False for digsaid in target_digit_said])
 
         #-- Save performance measures
 
@@ -193,7 +191,7 @@ class ErrorAnalyzer(object):
 
         response_segments = self.parse_response(raw_response, rownum, target_segments)
         if target_segments is None or response_segments is None:
-            return [None] * 4
+            return [None] * 3
 
         response = self.collapse_segments(response_segments)
 
@@ -339,7 +337,8 @@ class ErrorAnalyzer(object):
                 if i >= len(target_segments) or (not target_has_duplicate_segments and target_segments[i] in response_segments):
                     print('WARNING: "+" is ambiguous because the target and response have different order of segments. ' +
                           'Line {} ignored'.format(rownum))
-                    return None
+                    if self.fail_on_segment_order_error:
+                        return None
 
                 response_segments[i] = target_segments[i]
 
@@ -455,7 +454,7 @@ class ErrorAnalyzer(object):
         result = {}
         for i in range(1, ws.max_column+1):
             col_name = ws.cell(1, i).value
-            if col_name in xls_cols + xls_optional_cols:
+            if col_name in xls_cols:
                 result[col_name] = i
 
         missing_cols = [c for c in xls_cols if c not in result]

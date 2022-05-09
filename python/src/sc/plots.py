@@ -214,7 +214,7 @@ def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, f
 
 #---------------------------------------------------------------------------
 def plot_cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None, subj_grouping=None,
-                                n_cols=2, colors=('#496C51', '#6C9C76', '#A3E0B0', '#C7FAD2'), font_size=8, y_label=None):
+                                n_cols=2, colors=('black', '#496C51', '#6C9C76', '#A3E0B0', '#C7FAD2'), font_size=8, y_label=None):
     """
     Plot the mean value for each condition - separate plot per subject
     """
@@ -235,7 +235,7 @@ def plot_cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fi
 
     plt.figure(figsize=fig_size)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=fig_size)
-    fig.subplots_adjust(hspace=.8, wspace=0.3)
+    fig.subplots_adjust(hspace=.3, wspace=0.3)
     axes = np.reshape(axes, [n_rows * n_cols])
 
     for i_group, curr_group_subj_ids in enumerate(subj_grouping):
@@ -260,6 +260,8 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
     for i_subj, subj in enumerate(subj_ids):
         subj_df = df[df.Subject == subj]
         cond_means = [subj_df[subj_df.Condition == cond][dependent_var].mean() for cond in conditions]
+
+        print('Subject {}: Minimal condition = {}'.format(subj, conditions[np.argmin(cond_means)]))
 
         ax.plot(range(len(conditions)), cond_means, color=colors[i_subj], zorder=10, linewidth=0.5, marker='o')
 

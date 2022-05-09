@@ -17,7 +17,7 @@ def get_n_errors(raw_target, raw_response, consider_thousand_as_digit=False):
 
 
 #============================================================================================
-class ParseSegmentTest(unittest.TestCase):
+class CalcNErrors(unittest.TestCase):
 
     #-------------------
     #-- No errors
@@ -121,6 +121,14 @@ class ParseSegmentTest(unittest.TestCase):
     def test_thousand_is_different_as_decimal_word_and_number(self):
         w, c, d = get_n_errors('20000', '20')
         self.assertEqual((1, 0), (c, d))  # the class is missing; the digit is not
+
+
+#============================================================================================
+class RealScenarios(unittest.TestCase):
+
+    def test_1(self):
+        self.assertEqual((0, 0, 0), get_n_errors('48725', '+'))
+
 
 
 if __name__ == '__main__':
