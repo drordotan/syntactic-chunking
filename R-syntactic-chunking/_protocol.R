@@ -63,12 +63,18 @@ compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'A', 'B', 'PMissingMorp
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'B', 'C', 'PMissingMorphemes')
 compare_conditions(sdata1[sdata1$NWordsPerTarget == 6,], 'C', 'D', 'PMissingMorphemes')
 
+# The word-position effect is significant only in conditon D (#RStat:Exp1WordOrderPerCond) 
+word_pos_effect(sdata1w[sdata1w$condition == 'A',], with_item_intercept = FALSE)
+word_pos_effect(sdata1w[sdata1w$condition == 'B',], with_item_intercept = FALSE)
+word_pos_effect(sdata1w[sdata1w$condition == 'D',], with_item_intercept = FALSE)
+word_pos_effect(sdata1w[sdata1w$condition == 'A',])
+word_pos_effect(sdata1w[sdata1w$condition == 'B',])
+word_pos_effect(sdata1w[sdata1w$condition == 'D',])
+
 #-- Interaction between position (hundreds vs. thousands) and condition (A,B vs. D)
 pos_cond_interaction(sdata1w)
-pos_cond_interaction(sdata1w[sdata1w$condition %in% c('A', 'B'),], target_condition = 'A')
+pos_cond_interaction(sdata1w[sdata1w$condition %in% c('A', 'B') & sdata1w$word_order %in% c(3, 4),], target_condition = 'A')
 
-# In condition D, the small difference between the first 2 conditions is not significant:
-pos_effect(sdata1w[sdata1w$condition == 'D',], c(1, 2))
 
 #-- Experiment 2
 #------------------

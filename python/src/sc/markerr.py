@@ -9,20 +9,13 @@ import pandas as pd
 from mtl import verbalnumbers
 
 
-xls_copy_cols = 'Block', 'Condition', 'ItemNum', 'target', 'response', 'NWordsPerTarget'
-xls_cols = ('Subject', ) + xls_copy_cols + ('NMissingWords', 'NMissingDigits', 'NMissingClasses')
-xls_out_cols = ('Subject', ) + xls_copy_cols + \
-               ('NTargetDigits', 'NMissingWords', 'PMissingWords', 'NMissingDigits',
-                'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes',
-                'DULMismatch', 'DURFound', 'HDRFound', 'HDRMismatch', 'DULFound', 'DURMismatch')
-
 
 # noinspection PyMethodMayBeStatic
 class ErrorAnalyzer(object):
 
     #------------------------------------------------------
     def __init__(self, digit_mapping=None, subj_id_transformer=None, consider_thousand_as_digit=True, accuracy_per_digit=False,
-                 fail_on_segment_order_error=False):
+                 fail_on_segment_order_error=False, subj_id_in_xls=True, in_col_names=None):
         """
 
         :param digit_mapping:
@@ -40,9 +33,22 @@ class ErrorAnalyzer(object):
         self.accuracy_per_digit = accuracy_per_digit
         self.fail_on_segment_order_error = fail_on_segment_order_error
 
+        self.in_col_names = dict(block='Block', condition='Condition', itemnum='ItemNum', target='target', response='response', nwords='NWordsPerTarget')
+        if in_col_names is not None:
+            for k, v in in_col_names.items():
+                assert k in self.in_col_names, 'Invalid in_col_names - unexpected column "{}"'.format(k)
+                self.in_col_names[k] = v
+
+        self.subj_id_in_xls = subj_id_in_xls
+        self.xls_copy_cols = tuple(c for c in self.in_col_names.values() if c is not None)
+        self.xls_cols = (('Subject',) if subj_id_in_xls else ()) + self.xls_copy_cols
+        self.xls_out_cols = ('Subject',) + self.xls_copy_cols + \
+                            ('NTargetDigits', 'NMissingWords', 'PMissingWords', 'NMissingDigits',
+                             'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes')
+
 
     #------------------------------------------------------
-    def run(self, in_fn, out_dir=None, worksheet='data', out_fn_prefix='data_coded'):
+    def run_for_worksheet(self, in_fn, worksheet='data', out_dir=None, out_fn_prefix='data_coded'):
         """
         Analyze the error rates (digit, class, morpheme, word) in each trial
 
@@ -51,18 +57,45 @@ class ErrorAnalyzer(object):
         :param out_dir: Directory for output files
         :param out_fn_prefix:
         """
+        self.run_for_worksheets(in_fn, [worksheet], out_dir, out_fn_prefix)
 
-        in_ws, col_inds = self._open_input_file(in_fn, worksheet)
+
+    #------------------------------------------------------
+    def run_for_worksheets(self, in_fn, worksheets, out_dir=None, out_fn_prefix='data_coded'):
+        """
+        Analyze the error rates (digit, class, morpheme, word) in each trial
+        """
+
         out_wb, out_ws = self.create_output_workbook()
+        wb = openpyxl.load_workbook(in_fn)
 
         result_per_word = []
 
         ok = True
-        for rownum in range(2, in_ws.max_row+1):
-            ok = self.parse_row(in_ws, out_ws, rownum, col_inds, result_per_word) and ok
+        n_rows = 1
+
+        for worksheet in worksheets:
+            print('\nProcessing worksheet [{}]...'.format(worksheet))
+
+            in_ws, col_inds = self._open_worksheet(wb, worksheet, in_fn)
+            found_empty_rows = False
+
+            for rownum in range(2, in_ws.max_row+1):
+                rowok = self.parse_row(in_ws, out_ws, rownum, n_rows+1, col_inds, result_per_word, worksheet)
+
+                if rowok == 'empty':
+                    found_empty_rows = True
+                    continue
+
+                elif found_empty_rows:
+                    print('ERROR: row {} in worksheet "{}" contains data but there were few empty rows previously. Skipped.'.format(rownum, worksheet))
+                    rowok = False
+
+                ok = rowok and ok
+                n_rows += 1
 
         if ok:
-            print('{} rows were processed, no errors found.'.format(in_ws.max_row-1))
+            print('{} rows were processed, no errors found.'.format(n_rows))
         else:
             print('Some errors were encountered.')
 
@@ -78,38 +111,47 @@ class ErrorAnalyzer(object):
 
 
     #------------------------------------------------------
-    def parse_row(self, in_ws, out_ws, rownum, col_inds, result_per_word):
+    def parse_row(self, in_ws, out_ws, rownum, out_rownum, col_inds, result_per_word, worksheet):
         """
         Parse a single row, copy it to the output file
         Return True if processed OK.
         """
 
-        subj_id = in_ws.cell(rownum, col_inds['Subject']).value
-        raw_target = in_ws.cell(rownum, col_inds['target']).value
-        raw_response = in_ws.cell(rownum, col_inds['response']).value
-        n_target_words = in_ws.cell(rownum, col_inds['NWordsPerTarget']).value
+        if self.subj_id_in_xls:
+            subj_id = in_ws.cell(rownum, col_inds[self.in_col_names['subject']]).value
+        else:
+            subj_id = worksheet
 
-        if n_target_words is None:
-            print("Error in line {}: 'NWordsPerTarget' was not specified".format(rownum))
-            return False
+        raw_target = in_ws.cell(rownum, col_inds[self.in_col_names['target']]).value
+        raw_response = in_ws.cell(rownum, col_inds[self.in_col_names['response']]).value
 
-        if subj_id is None and raw_target is None:
-            print('Warning: row #{} seems empty, ignored'.format(rownum))
-            return True
+        if self.in_col_names['nwords'] is None:
+            n_target_words = None
+        else:
+            n_target_words = in_ws.cell(rownum, col_inds[self.in_col_names['nwords']]).value
+
+            if n_target_words is None:
+                print("Error in line {}: 'NWordsPerTarget' was not specified".format(rownum))
+                return False
+
+        if raw_target is None:
+            return 'empty'
 
         #-- Save basic columns
 
         subj_id = subj_id if self.subj_id_transformer is None else self.subj_id_transformer(subj_id)
-        self._save_value(out_ws, rownum, 'Subject', subj_id)
+        self._save_value(out_ws, out_rownum, 'Subject', subj_id)
 
-        for colname in xls_copy_cols:
-            self._save_value(out_ws, rownum, colname, in_ws.cell(rownum, col_inds[colname]).value)
+        for colname in self.xls_copy_cols:
+            self._save_value(out_ws, out_rownum, colname, in_ws.cell(rownum, col_inds[colname]).value)
 
         #-- Analyze target & response
 
         target, target_segments = self.parse_target(raw_target, rownum)
 
-        if n_target_words != len(target):
+        if n_target_words is None:
+            n_target_words = len(target)
+        elif n_target_words != len(target):
             print("Error in line {}: Invalid number of words ({}), expecting {} words".format(rownum, len(target), n_target_words))
             return False
 
@@ -124,15 +166,15 @@ class ErrorAnalyzer(object):
 
         n_target_digits = sum([t.digit is not None for t in target])
 
-        self._save_value(out_ws, rownum, 'NMissingWords', n_word_errs)
-        self._save_value(out_ws, rownum, 'NMissingDigits', n_digit_errs)
-        self._save_value(out_ws, rownum, 'NMissingClasses', n_class_errs)
+        self._save_value(out_ws, out_rownum, 'NMissingWords', n_word_errs)
+        self._save_value(out_ws, out_rownum, 'NMissingDigits', n_digit_errs)
+        self._save_value(out_ws, out_rownum, 'NMissingClasses', n_class_errs)
 
-        self._save_value(out_ws, rownum, 'NTargetDigits', n_target_digits)
-        self._save_value(out_ws, rownum, 'PMissingWords', n_word_errs / n_target_words)
-        self._save_value(out_ws, rownum, 'PMissingDigits', n_digit_errs / n_target_digits)
-        self._save_value(out_ws, rownum, 'PMissingClasses', n_class_errs / n_target_words)
-        self._save_value(out_ws, rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
+        self._save_value(out_ws, out_rownum, 'NTargetDigits', n_target_digits)
+        self._save_value(out_ws, out_rownum, 'PMissingWords', n_word_errs / n_target_words)
+        self._save_value(out_ws, out_rownum, 'PMissingDigits', n_digit_errs / n_target_digits)
+        self._save_value(out_ws, out_rownum, 'PMissingClasses', n_class_errs / n_target_words)
+        self._save_value(out_ws, out_rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
 
         self._save_accuracy_per_word(subj_id, in_ws, rownum, col_inds, target, target_word_said, target_digit_said, raw_response, raw_target,
                                      result_per_word)
@@ -151,7 +193,7 @@ class ErrorAnalyzer(object):
     def _save_accuracy_per_word(self, subj_id, in_ws, rownum, col_inds, target, target_word_said, target_digit_said,
                                 raw_response, raw_target, result_per_word):
 
-        block = in_ws.cell(rownum, col_inds['Block']).value
+        block = None if self.in_col_names['block'] is None else in_ws.cell(rownum, col_inds[self.in_col_names['block']]).value
         cond_name = in_ws.cell(rownum, col_inds['Condition']).value
         item_num = in_ws.cell(rownum, col_inds['ItemNum']).value
         n_target_words = len(target_word_said)
@@ -204,7 +246,7 @@ class ErrorAnalyzer(object):
 
     #------------------------------------------------------
     def _save_value(self, out_ws, rownum, colname, value):
-        out_ws.cell(rownum, 1 + xls_out_cols.index(colname)).value = value
+        out_ws.cell(rownum, 1 + self.xls_out_cols.index(colname)).value = value
 
 
     #------------------------------------------------------
@@ -435,14 +477,13 @@ class ErrorAnalyzer(object):
 
 
     #------------------------------------------------------
-    def _open_input_file(self, filename, worksheet):
-        wb = openpyxl.load_workbook(filename)
+    def _open_worksheet(self, wb, worksheet, filename):
         if len(wb.worksheets) == 1:
             ws = wb.worksheets[0]
         else:
             sheet_names = [s.title for s in wb.worksheets]
             if worksheet not in sheet_names:
-                raise Exception('{} does not contain any worksheet named "data"'.format(filename))
+                raise Exception('{} does not contain any worksheet named "{}"'.format(filename, worksheet))
             ws = wb.get_sheet_by_name(worksheet)
 
         col_inds = self._xls_structure(ws)
@@ -454,10 +495,10 @@ class ErrorAnalyzer(object):
         result = {}
         for i in range(1, ws.max_column+1):
             col_name = ws.cell(1, i).value
-            if col_name in xls_cols:
+            if col_name in self.xls_cols:
                 result[col_name] = i
 
-        missing_cols = [c for c in xls_cols if c not in result]
+        missing_cols = [c for c in self.xls_cols if c not in result]
         if len(missing_cols) > 0:
             raise Exception('Invalid file format: columns {} are missing'.format(",".join(missing_cols)))
 
@@ -470,7 +511,7 @@ class ErrorAnalyzer(object):
         wb = openpyxl.Workbook()
         ws = wb.worksheets[0]
 
-        for i_col, colname in enumerate(xls_out_cols):
+        for i_col, colname in enumerate(self.xls_out_cols):
             ws.cell(1, i_col+1).value = colname
 
         return wb, ws

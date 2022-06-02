@@ -51,6 +51,18 @@ sc.analyze.compare_conds_per_item(exp1, 'D', 'B', 'PMissingMorphemes')
 sc.analyze.compare_conds_per_subj(exp1, 'B', 'D', 'PMissingMorphemes')
 
 
+#-- Analysis of word order (PStat:FigExp1PositionEffect
+exp1words = pd.read_csv(d+'exp1&2/data_coded_words.csv')
+exp1words = exp1words[exp1words.n_target_words == 6]
+
+sc.plots.plot_digit_accuracy_per_position(exp1words, save_as=fig_dir+'exp1_acc_per_pos_new.pdf',
+                                          conditions=['A', 'B', 'D'], cond_names=['A (grammatical)', 'B', 'D (fragmented)'],
+                                          colors=GREENS, ylim=(0, .33), d_y_ticks=0.1, fig_size=(6, 3), font_size=12,
+                                          marker_text=(('T', 'O', 'H', 'T', 'O'),
+                                                       ('H', 'T', 'O', 'T', 'O'),
+                                                       ('O', 'O', 'T', 'T', 'H')))
+
+
 #  Experiment 2: Mixed
 #-------------------------
 

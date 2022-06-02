@@ -38,7 +38,7 @@ def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None,
 
 #---------------------------------------------------------------------------
 def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_ticks, fig_size, cond_names, conditions=None, dependent_var_names=None,
-                                      cond_comparison_text=None, colors=None, font_size=None, show_legend=True):
+                                      cond_comparison_text=None, colors=None, font_size=None, show_legend=True, visible_y_labels=1):
     """
     Plot the mean value for each condition - multiple measures
 
@@ -92,7 +92,7 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
 
     ax = plt.gca()
 
-    _format_conds_graph(ax, conditions, d_y_ticks, n_conds, ymax, font_size=font_size, x_labels=False, visible_y_labels=2)
+    _format_conds_graph(ax, conditions, d_y_ticks, n_conds, ymax, font_size=font_size, x_labels=False, visible_y_labels=visible_y_labels)
     ax.set_xticks([i_dv*(n_conds+1) + ((n_conds+1) / 2 - 1) for i_dv in range(len(dependent_vars))])
     ax.set_xticklabels(dependent_var_names, fontsize=font_size)
     ax.set_ylabel('Error rate', fontsize=font_size)
@@ -121,15 +121,6 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
 #---------------------------------------------------------------------------
 def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=True, cond_names=None, visible_y_labels=None):
     """
-
-    :param ax:
-    :param conditions:
-    :param dy:
-    :param n_conds:
-    :param ymax:
-    :param font_size:
-    :param x_labels:
-    :param cond_names:
     :param visible_y_labels: If specified (int), show only every nth y label
     """
 
@@ -270,19 +261,15 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
 
 
 #---------------------------------------------------------------------------
-def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=None, cond_names=None, dec_pos_names=None, ylim=(0, 1),
-                                     d_y_ticks=None, font_size=None, fig_size=None):
-
-    if dec_pos_names is None:
-        dec_pos_names = ('Ones', 'Tens', 'Hundreds', 'Thousands', 'Myriads', 'HThousand')
+def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=None, cond_names=None, ylim=(0, 1),
+                                     d_y_ticks=None, font_size=None, fig_size=None, text_dy=-0.005, marker_text=None):
 
     if len(df.n_target_words.unique()) > 1:
         raise ValueError('ERROR: the data contains stimuli of different lengths')
 
     n_target_words = df.n_target_words[0]
-    dec_pos_names = dec_pos_names[:(n_target_words-1)][::-1]
 
-    x = list(range(n_target_words - 1))
+    x = list(range(1, n_target_words+1))
 
     df = df[~df.digit_ok.isnull()]
 
@@ -304,14 +291,17 @@ def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=N
         y = [1 - cdf.digit_ok[cdf.word_order == pos].mean() for pos in positions]
 
         color = None if colors is None else colors[i_cond]
-        plt.plot(x, y, color=color, marker='o')
+        plt.plot(positions, y, color=color, marker='o', markersize=8)
+
+        if marker_text is not None:
+            for xx, yy, txt in zip(positions, y, marker_text[i_cond]):
+                plt.text(xx, yy+text_dy, txt, fontsize=7, horizontalalignment='center', color='white')
 
     plt.legend(cond_names)
 
     ax = plt.gca()
 
     ax.set_xticks(x)
-    ax.set_xticklabels(dec_pos_names)
 
     plt.ylim(ylim)
     if d_y_ticks is not None:
@@ -319,6 +309,7 @@ def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=N
 
     ax.grid(axis='y', color=[0.9]*3, linewidth=0.5, zorder=0)
     plt.ylabel('Errors', fontsize=font_size)
+    plt.xlabel('Serial position of word', fontsize=font_size)
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
