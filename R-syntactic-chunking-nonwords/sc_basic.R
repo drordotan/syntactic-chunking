@@ -4,38 +4,49 @@ load_data <- function(filename, useNErrExcludingOrder=FALSE) {
   sdata = read.csv(filename)
   sdata$ItemNum <- factor(sdata$ItemNum)
   sdata$Subject <- factor(sdata$Subject)
+  sdata$NWordsPerTarget = 4
   return(sdata)
 }
 
 #--------------------------------------------------------------------------------------------------
-compare_conditions <- function(sdata, cond1, cond2, dependent_var, item_intercept=TRUE, logistic=FALSE, save.full.model=NA, models_dir=NA) {
+compare_conditions <- function(sdata, dependent_var, cond1=NA, cond2=NA, item_intercept=TRUE, save.full.model=NA, models_dir=NA) {
   
-  sdata = sdata[sdata$Condition %in% c(cond1, cond2),]
-  sdata$cond2 = sdata$Condition %in% cond2
+  numeric_condition = is.na(cond1)
   
-  if (logistic) {
-    sdata = repeat_rows(sdata, 'NWordsPerTarget')
+  if (numeric_condition) {
+    condition = sdata$Condition
+    sdata$Condition = 1
+    sdata$Condition[condition == 'B'] = 2
+    sdata$Condition[condition == 'C'] = 3
+  } else {
+    sdata = sdata[sdata$Condition %in% c(cond1, cond2),]
+    sdata$cond2 = sdata$Condition %in% cond2
+
+    cond1_order = sdata[, sprintf('order%s', cond1)]
+    cond2_order = sdata[, sprintf('order%s', cond2)]
+    sdata$cond_order = cond1_order < cond2_order
   }
   
   item_intercept_factor = ifelse(item_intercept, ' + (1|ItemNum)', '')
   
-  formula1 = sprintf('%s ~ cond2 + (1|Subject)%s', dependent_var, item_intercept_factor)
-  formula0 = sprintf('%s ~ (1|Subject)%s', dependent_var, item_intercept_factor)
+  formula1 = sprintf('%s ~ Condition + cond_order + (1|Subject)%s', dependent_var, item_intercept_factor)
+  formula0 = sprintf('%s ~ cond_order + (1|Subject)%s', dependent_var, item_intercept_factor)
   
   print(formula1)
-  if (logistic) {
-    mdl1 = glmer(as.formula(formula1), data = sdata, family=binomial) 
-    mdl0 = glmer(as.formula(formula0), data = sdata, family=binomial) 
+  mdl1 = lmer(as.formula(formula1), data = sdata, REML=FALSE) 
+  mdl0 = lmer(as.formula(formula0), data = sdata, REML=FALSE) 
+  
+  if (numeric_condition) {
+    print_model_coefs(mdl1, '#Condition')
+    compare_models(mdl0, mdl1, 'condition')
   } else {
-    mdl1 = lmer(as.formula(formula1), data = sdata, REML=FALSE) 
-    mdl0 = lmer(as.formula(formula0), data = sdata, REML=FALSE) 
+    cond1name = paste(cond1, collapse=",")
+    cond2name = paste(cond2, collapse=",")
+    compare_models(mdl0, mdl1, sprintf('condition %s (%d items) vs %s  (%d items)', cond1name, sum(!sdata$cond2), cond2name, sum(sdata$cond2)))
+
+    print_model_coefs(mdl1, 'Condition', factor_est_levels=list(Condition=max(cond1, cond2)))
   }
   
-  cond1name = paste(cond1, collapse=",")
-  cond2name = paste(cond2, collapse=",")
-  compare_models(mdl0, mdl1, sprintf('condition %s (%d items) vs %s  (%d items)', cond1name, sum(!sdata$cond2), cond2name, sum(sdata$cond2)))
-  
-  print_model_coefs(mdl1, '@cond2')
   
   if (! is.na(save.full.model)) {
     save_model_coefs(mdl1, save.full.model, models_dir)
@@ -173,37 +184,43 @@ item_num_effect <- function(sdata, dependent_var) {
 #-- Interaction between position (hundreds vs. thousands) and condition (A,B vs. D)
 pos_cond_interaction <- function(sdata, target_condition='D') {
   
-  sdata = sdata[!is.na(sdata$digit_ok) & sdata$n_target_words == 6 & sdata$word_order < 6,]
-  sdata$word_order = as.numeric(sdata$word_order)
+  sdata = sdata[!is.na(sdata$digit_ok) & sdata$n_target_words == 6,]
   sdata$condD = sdata$condition == target_condition
   
-  mdl1 = glmer(digit_ok ~ condD * word_order + (1|item_num) + (1|subject), data=sdata, family=binomial)
-  mdl0 = glmer(digit_ok ~ condD + word_order + (1|item_num) + (1|subject), data=sdata, family=binomial)
+  sdata$position = NA
   
-  compare_models(mdl0, mdl1, 'condition-WordOrder interaction')
-  print_model_coefs(mdl1, 'condDTRUE:word_order')
+  for (cond in unique(sdata$condition)) {
+    word_orders = sort(unique(sdata$word_order[sdata$condition == cond]))
+    sdata$position[sdata$condition == cond] <- mapvalues(sdata$word_order[sdata$condition == cond], from=word_orders, to=1:length(word_orders))
+  }
+  
+  sdata <- sdata[sdata$position %in% c(2,3),]
+  
+  mdl1 = glmer(digit_ok ~ condD * position + (1|item_num) + (1|subject), data=sdata, family=binomial)
+  mdl0 = glmer(digit_ok ~ condD + position + (1|item_num) + (1|subject), data=sdata, family=binomial)
+
+  compare_models(mdl0, mdl1, 'condition-position interaction')
+  print_model_coefs(mdl1, 'condDTRUE:position')
 }
 
 #--------------------------------------------------------------------------------------------------
-#-- Interaction between position (hundreds vs. thousands) and condition (A,B vs. D)
-word_pos_effect <- function(sdata, with_item_intercept=TRUE) {
+#-- Effect of position in one conditions
+pos_effect <- function(sdata, positions) {
   
-  sdata = sdata[!is.na(sdata$digit_ok) & sdata$n_target_words == 6 & sdata$word_order < 6,]
-  sdata$word_order = as.numeric(sdata$word_order)
+  sdata = sdata[!is.na(sdata$digit_ok) & sdata$n_target_words == 6,]
 
   sdata$position = NA
+  
   word_orders = sort(unique(sdata$word_order))
   sdata$position <- mapvalues(sdata$word_order, from=word_orders, to=1:length(word_orders))
-
-  item_random_factor = ifelse(with_item_intercept, ' + (1|item_num)', '')
-  formula1 = sprintf('digit_ok ~ word_order + (1|subject)%s', item_random_factor)
-  formula0 = sprintf('digit_ok ~ (1|subject)%s', item_random_factor)
   
-  mdl1 = glmer(as.formula(formula1), data=sdata, family=binomial)
-  mdl0 = glmer(as.formula(formula0), data=sdata, family=binomial)
+  sdata <- sdata[sdata$position %in% positions,]
   
-  compare_models(mdl0, mdl1, 'word_order')
-  print_model_coefs(mdl1, 'word_order')
+  mdl1 = glmer(digit_ok ~ position + (1|item_num) + (1|subject), data=sdata, family=binomial)
+  mdl0 = glmer(digit_ok ~ (1|item_num) + (1|subject), data=sdata, family=binomial)
+  
+  compare_models(mdl0, mdl1, 'position')
+  print_model_coefs(mdl1, 'position')
 }
 
 
