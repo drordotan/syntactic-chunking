@@ -33,6 +33,7 @@ compare_conditions(sdata, 'PMissingMorphemes', save.full.model='exp1_morph_numer
 compare_conditions(sdata, 'PMissingDigits', 'A', 'B', save.full.model='exp1_digits_AB', models_dir=models_dir)
 compare_conditions(sdata, 'PMissingDigits', 'B', 'C', save.full.model='exp1_digits_BC', models_dir=models_dir)
 compare_conditions(sdata, 'PMissingDigits', 'A', 'C', save.full.model='exp1_digits_AC', models_dir=models_dir)
+compare_conditions(sdata, 'PMissingDigits', save.full.model='exp1_digits_numeric', models_dir=models_dir)
 
 compare_conditions(sdata, 'PMissingClasses', 'A', 'B', save.full.model='exp1_class_AB', models_dir=models_dir)
 compare_conditions(sdata, 'PMissingClasses', 'B', 'C', save.full.model='exp1_class_BC', models_dir=models_dir)

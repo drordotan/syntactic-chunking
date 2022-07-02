@@ -3,10 +3,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import sc.utils
-
-
-#---------------------------------------------------------------------------
 from sc.analyze import get_value_per_subj_and_cond
+
 
 #---------------------------------------------------------------------------
 def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None):
@@ -55,7 +53,12 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
                     The inner list contains #conditions-1 texts to print as significance-comparison between adjacent conditions.
     :param colors: List of bar colors - one per condition
     :param font_size:
+    :param visible_y_labels: which y labels should be plotted (unplotted labels only have ticks)
+    :param show_legend: Whether or not to plot the legend
     """
+
+    conds_in_df = df.Condition.unique()
+    assert sum(_isempty(c) for c in conds_in_df) == 0, "The 'Condition' column is empty in some rows"
 
     if conditions is None:
         conditions = sorted(df.Condition.unique())
@@ -118,15 +121,14 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
     plt.savefig(out_fn)
     plt.close(fig)
 
+
 #---------------------------------------------------------------------------
 def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=True, cond_names=None, visible_y_labels=None):
     """
     :param visible_y_labels: If specified (int), show only every nth y label
     """
 
-    if ymax is None:
-        ymax = plt.ylim()[1]
-    else:
+    if ymax is not None:
         plt.ylim([0, ymax])
 
     if x_labels:
@@ -156,14 +158,14 @@ def set_yticks(ax, dy, font_size=None, visible_y_labels=None, ymin=0):
 
     y_labels = ['{:.0f}%'.format(y*100) for y in y_ticks]
     if visible_y_labels is not None:
-        y_labels = [y if i%visible_y_labels == 0 else '' for i, y in enumerate(y_labels)]
+        y_labels = [y if i % visible_y_labels == 0 else '' for i, y in enumerate(y_labels)]
 
     ax.set_yticklabels(y_labels, fontsize=font_size)
 
 
 #---------------------------------------------------------------------------
 def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, conds=None, cond_names=None, font_size=8,
-                                 get_subj_id_func=str, sort_by_delta=True, colors = (0.3, 0.6, 0.8), legend_loc=None):
+                                 get_subj_id_func=str, sort_by_delta=True, colors=(0.3, 0.6, 0.8), legend_loc=None):
     """
     Plot the mean value for each condition - separate plot per subject
     """
@@ -261,7 +263,7 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
 
 
 #---------------------------------------------------------------------------
-def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=None, cond_names=None, ylim=(0, 1),
+def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=None, cond_names=None, pos_field='word_order', ylim=(0, 1),
                                      d_y_ticks=None, font_size=None, fig_size=None, text_dy=-0.005, marker_text=None):
 
     if len(df.n_target_words.unique()) > 1:
@@ -285,10 +287,13 @@ def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=N
     for i_cond, cond in enumerate(conditions):
         cdf = df[df.condition == cond]
 
-        positions = sorted(cdf.word_order.unique())
-        assert len(positions) == n_target_words - 1
+        positions = sorted(cdf[pos_field].unique())
+        if n_target_words < 5:
+            assert len(positions) == n_target_words
+        else:
+            assert len(positions) == n_target_words - 1
 
-        y = [1 - cdf.digit_ok[cdf.word_order == pos].mean() for pos in positions]
+        y = [1 - cdf.digit_ok[cdf[pos_field] == pos].mean() for pos in positions]
 
         color = None if colors is None else colors[i_cond]
         plt.plot(positions, y, color=color, marker='o', markersize=8)
@@ -319,3 +324,7 @@ def plot_digit_accuracy_per_position(df, save_as=None, colors=None, conditions=N
 
     if save_as is not None:
         fig.savefig(save_as)
+
+
+def _isempty(v):
+    return v is None or v == '' or (isinstance(v, float) and math.isnan(v))

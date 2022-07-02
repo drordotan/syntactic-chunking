@@ -25,5 +25,4 @@ analyzer = sc.markerr.ErrorAnalyzer(consider_thousand_as_digit=False,
                                     in_col_names=dict(block=None, nwords=None), subj_id_in_xls=False,
                                     process_phonological_err_count=True, set_per_subject=cond_order_info)
 
-#analyzer.run_for_worksheets(base_dir+'raw-data.xlsx', worksheets=['SC{}'.format(i) for i in range(3, 19) if i != 4], out_dir=base_dir)
 analyzer.run_for_worksheets(base_dir+'raw-data.xlsx', out_dir=base_dir)

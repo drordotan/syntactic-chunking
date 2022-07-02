@@ -220,21 +220,3 @@ p_str <- function(p) {
     return(sprintf("1e%d", ceiling(log(p) / log(10))))
   }
 }
-
-
-#--------------------------------------------------------------------------------------------------
-# Repeat each row of the data frame N times; N is determined, per row, according to a given column
-repeat_rows <- function(dataf, ntimes_col) {
-  result = data.frame()
-  all_ntimes = unique(dataf[,ntimes_col])
-  
-  for (ntim in all_ntimes) {
-    inds = which(dataf[,ntimes_col] == ntim)
-    result = rbind(result, dataf[rep(inds, each=ntim), ])
-  }
-  
-  return(result)
-}
-
-
-

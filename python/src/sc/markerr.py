@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 from mtl import verbalnumbers
 
+import mtl.verbalnumbers.hebrew as hebnum
+
+lexical_classes = hebnum.ones, hebnum.tens, hebnum.hundreds, hebnum.thousands
 
 
 # noinspection PyMethodMayBeStatic
@@ -212,7 +215,7 @@ class ErrorAnalyzer(object):
 
         #-- Phonological errors
         if self.process_phonological_err_count:
-            n_phonerr = [in_ws.cell(rownum, col_inds['phonerr{}'.format(i)]).value for i in range(1, n_target_words+1)]
+            n_phonerr = [in_ws.cell(rownum, i).value for c, i in col_inds.items() if c is not None and c.startswith('phonerr')]
             n_phonerr = [n for n in n_phonerr if not _isnull(n)]
             if sum(not isinstance(n, (int, float)) for n in n_phonerr) > 0:
                 print('Error in line {}: invalid number of phonological errors ({})'.format(rownum, n_phonerr))
@@ -260,6 +263,9 @@ class ErrorAnalyzer(object):
         n_target_words = len(target_word_said)
 
         for i, (word_said, digit_said, target_word) in enumerate(zip(target_word_said, target_digit_said, target)):
+
+            lexical_class_order = lexical_classes.index(target_word.lexical_class) if target_word.lexical_class in lexical_classes else ''
+
             r = dict(subject=subj_id,
                      block=block,
                      condition=cond_name,
@@ -268,6 +274,8 @@ class ErrorAnalyzer(object):
                      target=raw_target,
                      response=raw_response,
                      word_order=n_target_words-i,
+                     word_class=target_word.lexical_class,
+                     word_class_order=lexical_class_order,
                      target_word=target_word,
                      word_ok=1 if word_said else 0,
                      digit_ok=None if digit_said is None else 1 if digit_said else 0,
