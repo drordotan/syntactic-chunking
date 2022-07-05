@@ -207,7 +207,8 @@ def plot_2cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, f
 
 #---------------------------------------------------------------------------
 def plot_cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None, subj_grouping=None,
-                                n_cols=2, colors=('black', '#496C51', '#6C9C76', '#A3E0B0', '#C7FAD2'), font_size=8, y_label=None):
+                                n_cols=2, colors=('black', '#496C51', '#6C9C76', '#A3E0B0', '#C7FAD2'), font_size=8, y_label=None,
+                                print_cond_order=False, cond_order_text_dy=-0.01):
     """
     Plot the mean value for each condition - separate plot per subject
     """
@@ -233,7 +234,8 @@ def plot_cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fi
 
     for i_group, curr_group_subj_ids in enumerate(subj_grouping):
         plot_subject_group(df, dependent_var, curr_group_subj_ids, conditions, cond_names, ax=axes[i_group],
-                           ymax=ymax, dy=dy, colors=colors, font_size=font_size)
+                           ymax=ymax, dy=dy, colors=colors, font_size=font_size,
+                           print_cond_order=print_cond_order, cond_order_text_dy=cond_order_text_dy)
         if i_group % 2 == 0:
             axes[i_group].set_ylabel(y_label, fontsize=font_size)
 
@@ -245,7 +247,8 @@ def plot_cond_means_per_subject(df, dependent_var, out_fn, ymax=None, dy=0.1, fi
 
 
 #---------------------------------------------------------------------------
-def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, ymax, dy, colors, font_size):
+def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, ymax, dy, colors, font_size,
+                       print_cond_order, cond_order_text_dy):
     """
     Plot a group of subjects as one figure (one panel)
     """
@@ -256,7 +259,15 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
 
         print('Subject {}: Minimal condition = {}'.format(subj, conditions[np.argmin(cond_means)]))
 
-        ax.plot(range(len(conditions)), cond_means, color=colors[i_subj], zorder=10, linewidth=0.5, marker='o')
+        x = range(len(conditions))
+        ax.plot(x, cond_means, color=colors[i_subj], zorder=10, linewidth=0.5, marker='o')
+
+        if print_cond_order:
+            subj_co = list(subj_df.cond_order.unique())
+            assert len(subj_co) == 1, "More than one cond_order for subject {}".format(subj)
+            cond_order = [subj_co[0].index(c) + 1 for c in conditions]
+            for xx, yy, txt in zip(x, cond_means, cond_order):
+                ax.text(xx, yy+cond_order_text_dy, txt, fontsize=6, horizontalalignment='center', color='white', zorder=20)
 
     _format_conds_graph(ax, conditions, dy, len(conditions), ymax, font_size=font_size, cond_names=cond_names)
     ax.legend([str(s) for s in subj_ids], fontsize=5)

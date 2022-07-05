@@ -19,10 +19,11 @@ class ErrorAnalyzer(object):
 
     #------------------------------------------------------
     def __init__(self, digit_mapping=None, subj_id_transformer=None, consider_thousand_as_digit=True, accuracy_per_digit=False,
-                 fail_on_segment_order_error=False, subj_id_in_xls=True, in_col_names=None, process_phonological_err_count=False,
+                 fail_on_segment_order_error=False, subj_id_in_xls=True, in_col_names=None, phonological_error_flds=(),
                  set_per_subject=None):
         """
 
+        :param phonological_error_flds: List of xls columns which contain number of phonological errors. All these columns will be summed.
         :param digit_mapping:
         :param subj_id_transformer: Function for transfoming the subject ID field
         :param consider_thousand_as_digit:  Whether the word "thousand" should count towards digit errors also in numbers with 5 or 6 digits
@@ -37,7 +38,7 @@ class ErrorAnalyzer(object):
         self.consider_thousand_as_digit = consider_thousand_as_digit
         self.accuracy_per_digit = accuracy_per_digit
         self.fail_on_segment_order_error = fail_on_segment_order_error
-        self.process_phonological_err_count = process_phonological_err_count
+        self.phonological_error_flds = phonological_error_flds
         self.subj_id_in_xls = subj_id_in_xls
 
         self.in_col_names = dict(block='Block', condition='Condition', itemnum='ItemNum', target='target', response='response',
@@ -56,7 +57,7 @@ class ErrorAnalyzer(object):
                             ('NTargetDigits', 'NMissingWords', 'PMissingWords', 'NMissingDigits',
                              'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes')
 
-        if self.process_phonological_err_count:
+        if len(self.phonological_error_flds) > 0:
             self.xls_out_cols += 'NPhonologicalErrors',
 
         if set_per_subject is None:
@@ -86,7 +87,8 @@ class ErrorAnalyzer(object):
         """
         Analyze the error rates (digit, class, morpheme, word) in each trial
 
-        :param set_per_subject: values to set for each participant. This is a dict with a 'subjid' entry and one additional entry for each column to set
+        :param set_per_subject: values to set for each participant. This is a dict with a 'subjid' entry and
+                                one additional entry for each column to set
         """
 
         out_wb, out_ws = self.create_output_workbook()
@@ -110,6 +112,9 @@ class ErrorAnalyzer(object):
             subj_n_phonerr = 0
 
             for rownum in range(2, in_ws.max_row+1):
+                if self.fixed_value_per_subject is not None and worksheet in self.fixed_value_per_subject:
+                    self.set_fixed_values(self.fixed_value_per_subject[worksheet], out_ws, out_row_num)
+
                 rc = self.parse_row(in_ws, out_ws, rownum, out_row_num, col_inds, result_per_word, worksheet)
 
                 if rc == 'empty':
@@ -125,15 +130,17 @@ class ErrorAnalyzer(object):
                 else:
                     subj_n_phonerr += rc
                     out_row_num += 1
-                    if self.fixed_value_per_subject is not None and worksheet in self.fixed_value_per_subject:
-                        self.set_fixed_values(self.fixed_value_per_subject[worksheet], out_ws, out_row_num)
 
                     if found_empty_rows:
-                        print('ERROR: row {} in worksheet "{}" contains data but there were few empty rows previously. Skipped.'.format(rownum, worksheet))
+                        print('ERROR: row {} in worksheet "{}" contains data but there were few empty rows previously. Skipped.'.
+                              format(rownum, worksheet))
                         ok = False
 
             n_excluded.append(subj_n_excluded)
             n_phonerr.append(int(subj_n_phonerr))
+
+            #-- Last row is not needed
+            out_ws.delete_rows(out_row_num)
 
         if ok:
             print('{} rows were processed, no errors found.'.format(out_row_num-1))
@@ -151,7 +158,7 @@ class ErrorAnalyzer(object):
             pd.DataFrame(result_per_word).to_csv(out_dir + os.sep + out_fn_prefix + '_words.csv', index=False)
 
             subjstat = pd.DataFrame(dict(subject=worksheets, n_excluded=n_excluded))
-            if self.process_phonological_err_count:
+            if len(self.phonological_error_flds) > 0:
                 subjstat['n_phonerr'] = n_phonerr
             subjstat.to_csv(out_dir + os.sep + out_fn_prefix + '_subjstat.csv', index=False)
 
@@ -214,8 +221,8 @@ class ErrorAnalyzer(object):
         n_digit_errs = sum([digsaid is False for digsaid in target_digit_said])
 
         #-- Phonological errors
-        if self.process_phonological_err_count:
-            n_phonerr = [in_ws.cell(rownum, i).value for c, i in col_inds.items() if c is not None and c.startswith('phonerr')]
+        if len(self.phonological_error_flds) > 0:
+            n_phonerr = [in_ws.cell(rownum, col_inds[c]).value for c in self.phonological_error_flds]
             n_phonerr = [n for n in n_phonerr if not _isnull(n)]
             if sum(not isinstance(n, (int, float)) for n in n_phonerr) > 0:
                 print('Error in line {}: invalid number of phonological errors ({})'.format(rownum, n_phonerr))
@@ -240,10 +247,17 @@ class ErrorAnalyzer(object):
         self._save_value(out_ws, out_rownum, 'PMissingClasses', n_class_errs / n_target_words)
         self._save_value(out_ws, out_rownum, 'PMissingMorphemes', (n_class_errs + n_digit_errs) / (n_target_words + n_target_digits))
 
+        self.custom_process_row(in_ws, out_ws, rownum, out_rownum, col_inds)
+
         self._save_accuracy_per_word(subj_id, in_ws, rownum, col_inds, target, target_word_said, target_digit_said, raw_response, raw_target,
                                      result_per_word)
 
         return n_phonerr
+
+
+    #------------------------------------------------------------------------------
+    def custom_process_row(self, in_ws, out_ws, in_rownum, out_rownum, col_inds):
+        pass
 
 
     #------------------------------------------------------------------------------
