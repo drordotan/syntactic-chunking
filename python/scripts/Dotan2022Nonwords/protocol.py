@@ -26,7 +26,7 @@ sc.plots.plot_cond_means_multiple_measures(data, dependent_vars=['PMissingMorphe
 
 #-- Figure: Learning from block to block  (P:FigCmpBlocks)
 sc.plots.plot_cond_means_multiple([data[data.Condition == 'A'], data[data.Condition == 'B'], data[data.Condition == 'C']],
-                                  dependent_var='PMissingMorphemes',
+                                  dependent_var='PMissingMorphemes', ylabel='Morpheme error rate',
                                   cond_factor='block', conditions=(1, 2, 3),
                                   out_fn=fig_dir+'block_mean_per_cond.pdf', ymax=0.38, d_y_ticks=.1, fig_size=(6, 2),
                                   xlim=(-1, 12),

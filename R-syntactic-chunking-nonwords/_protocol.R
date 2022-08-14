@@ -37,5 +37,8 @@ compare_conditions(sdata, 'PMissingClasses', 'B', 'C', save.full.model='exp1_cla
 #-- Additional analyses
 
 block_effect(sdata, 'PMissingMorphemes')
+block_effect(sdata[sdata$Condition == 'A',], 'PMissingMorphemes')
+block_effect(sdata[sdata$Condition == 'B',], 'PMissingMorphemes')
+block_effect(sdata[sdata$Condition == 'C',], 'PMissingMorphemes')
 
-cond_block_interaction(sdata, 'PMissingMorphemes')
+#cond_block_interaction(sdata, 'PMissingMorphemes')

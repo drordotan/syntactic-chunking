@@ -76,20 +76,24 @@ block_effect <- function(sdata, dependent_var, item_intercept=TRUE, save.full.mo
   item_intercept_factor = ifelse(item_intercept, ' + (1|ItemNum)', '')
   
   sdata$block = as.numeric(sdata$block)
+  multiple_conditions = length(unique(sdata$Condition)) > 1
   
-  formula.full = sprintf('%s ~ block * Condition + (1|Subject)%s', dependent_var, item_intercept_factor)
-  formula.noint = sprintf('%s ~ block + Condition + (1|Subject)%s', dependent_var, item_intercept_factor)
-  formula0 = sprintf('%s ~ Condition + (1|Subject)%s', dependent_var, item_intercept_factor)
+  cond_factor = ifelse(multiple_conditions, 'Condition + ', '')
+  formula.noint = sprintf('%s ~ block + %s(1|Subject)%s', dependent_var, cond_factor, item_intercept_factor)
+  formula0 = sprintf('%s ~ %s(1|Subject)%s', dependent_var, cond_factor, item_intercept_factor)
   
-  print(formula.full)
-  mdl.full = lmer(as.formula(formula.full), data = sdata, REML=FALSE) 
+  print(formula.noint)
   mdl.noint = lmer(as.formula(formula.noint), data = sdata, REML=FALSE) 
   mdl0 = lmer(as.formula(formula0), data = sdata, REML=FALSE) 
   
-  print_model_coefs(mdl.full, '#block')
+  print_model_coefs(mdl.noint, '#block')
   compare_models(mdl0, mdl.noint, 'block')
   
-  compare_models(mdl.noint, mdl.full, 'condition*block interaction')
+  if (multiple_conditions) {
+    formula.full = sprintf('%s ~ block * Condition + (1|Subject)%s', dependent_var, item_intercept_factor)
+    mdl.full = lmer(as.formula(formula.full), data = sdata, REML=FALSE) 
+    compare_models(mdl.noint, mdl.full, 'condition*block interaction')
+  }
   
   if (! is.na(save.full.model)) {
     save_model_coefs(mdl1, save.full.model, models_dir)

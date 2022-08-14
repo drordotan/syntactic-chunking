@@ -42,18 +42,18 @@ class ErrorAnalyzer(object):
         self.subj_id_in_xls = subj_id_in_xls
 
         self.in_col_names = dict(block='Block', condition='Condition', itemnum='ItemNum', target='target', response='response',
-                                 nwords='NWordsPerTarget', exclude='exclude')
+                                 nwords='NWordsPerTarget', exclude='exclude', manual='manual')
         if in_col_names is not None:
             for k, v in in_col_names.items():
                 assert k in self.in_col_names, 'Invalid in_col_names - unexpected column "{}"'.format(k)
                 self.in_col_names[k] = v
 
-        optional_col_keys = 'exclude',
+        optional_col_keys = 'exclude', 'manual'
 
-        self.xls_copy_cols = tuple(c for k, c in self.in_col_names.items() if c is not None and k not in optional_col_keys)
+        self.xls_mandatory_cols = tuple(c for k, c in self.in_col_names.items() if c is not None and k not in optional_col_keys)
         self.xls_optional_cols = tuple(c for k, c in self.in_col_names.items() if c is not None and k in optional_col_keys)
-        self.xls_cols = (('Subject',) if subj_id_in_xls else ()) + self.xls_copy_cols
-        self.xls_out_cols = ('Subject',) + self.xls_copy_cols + self.xls_optional_cols + \
+        self.xls_cols = (('Subject',) if subj_id_in_xls else ()) + self.xls_mandatory_cols
+        self.xls_out_cols = ('Subject',)+self.xls_mandatory_cols+self.xls_optional_cols+ \
                             ('NTargetDigits', 'NMissingWords', 'PMissingWords', 'NMissingDigits',
                              'PMissingDigits', 'NMissingClasses', 'PMissingClasses', 'PMissingMorphemes')
 
@@ -106,10 +106,19 @@ class ErrorAnalyzer(object):
         for worksheet in worksheets:
             print('\nProcessing worksheet [{}]...'.format(worksheet))
 
-            in_ws, col_inds = self._open_worksheet(wb, worksheet, in_fn)
+            try:
+                in_ws, col_inds = self._open_worksheet(wb, worksheet, in_fn)
+            except ValueError as e:
+                print('>>> ERROR (worksheet ignored): {}'.format(e))
+                continue
+
             found_empty_rows = False
             subj_n_excluded = 0
             subj_n_phonerr = 0
+
+            if 'manual' in self.in_col_names:
+                nrep = sum('repeat' in str(in_ws.cell(rownum, col_inds[self.in_col_names['manual']]).value) for rownum in range(2, in_ws.max_row+1))
+                print('{}: {} excluded&repeated trials'.format(worksheet.title(), nrep))
 
             for rownum in range(2, in_ws.max_row+1):
                 if self.fixed_value_per_subject is not None and worksheet in self.fixed_value_per_subject:
@@ -200,7 +209,8 @@ class ErrorAnalyzer(object):
         subj_id = subj_id if self.subj_id_transformer is None else self.subj_id_transformer(subj_id)
         self._save_value(out_ws, out_rownum, 'Subject', subj_id)
 
-        for colname in self.xls_copy_cols:
+        copy_cols = self.xls_mandatory_cols + tuple([c for c in self.xls_optional_cols if self.in_col_names[c] in col_inds])
+        for colname in copy_cols:
             self._save_value(out_ws, out_rownum, colname, in_ws.cell(rownum, col_inds[colname]).value)
 
         #-- Analyze target & response
@@ -572,7 +582,7 @@ class ErrorAnalyzer(object):
         else:
             sheet_names = [s.title for s in wb.worksheets]
             if worksheet not in sheet_names:
-                raise Exception('{} does not contain any worksheet named "{}"'.format(filename, worksheet))
+                raise ValueError('{} does not contain any worksheet named "{}"'.format(filename, worksheet))
             ws = wb.get_sheet_by_name(worksheet)
 
         col_inds = self._xls_structure(ws)
@@ -588,7 +598,7 @@ class ErrorAnalyzer(object):
 
         missing_cols = [c for c in self.xls_cols if c not in result]
         if len(missing_cols) > 0:
-            raise Exception('Invalid file format: columns {} are missing'.format(",".join(missing_cols)))
+            raise ValueError('Invalid file format: columns {} are missing'.format(",".join(missing_cols)))
 
         return result
 

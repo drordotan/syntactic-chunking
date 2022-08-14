@@ -126,7 +126,7 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
 
 #---------------------------------------------------------------------------
 def plot_cond_means_multiple(datasets, dependent_var, out_fn, ymax, d_y_ticks, fig_size, cond_names=None, conditions=None,
-                             cond_factor='block', ds_names=None,
+                             cond_factor='block', ds_names=None, ylabel='Error rate',
                              cond_comparison_text=None, colors=None, font_size=None, show_legend=True, visible_y_labels=1,
                              legend_title=None, xlim=None):
     """
@@ -191,7 +191,7 @@ def plot_cond_means_multiple(datasets, dependent_var, out_fn, ymax, d_y_ticks, f
     _format_conds_graph(ax, conditions, d_y_ticks, n_conds, ymax, font_size=font_size, x_labels=False, visible_y_labels=visible_y_labels)
     ax.set_xticks([i_df*(n_conds+1)+((n_conds+1) / 2 - 1) for i_df in range(len(datasets))])
     ax.set_xticklabels(ds_names, fontsize=font_size)
-    ax.set_ylabel('Error rate', fontsize=font_size)
+    ax.set_ylabel(ylabel, fontsize=font_size)
 
     if cond_comparison_text is not None:
         cmp_lines_x_offset = 0.1
