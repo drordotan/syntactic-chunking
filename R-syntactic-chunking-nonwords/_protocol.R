@@ -20,21 +20,22 @@ Sys.setenv("R_IS_ASSIGNING" = 0)
 
 #--------------------------------------------------------------------------
 
-sdata = load_data(paste(data_dir, 'data_coded.csv', sep='/'))
+sdata = load_data(paste(data_dir, 'data_clean.csv', sep='/'))
 
-#-- Experiment 1
-#------------------
+#-- Pre-registered analyses
 
 compare_conditions(sdata, 'PMissingMorphemes','A', 'B', save.full.model='exp1_morph_AB', models_dir=models_dir)
 compare_conditions(sdata, 'PMissingMorphemes','B', 'C', save.full.model='exp1_morph_BC', models_dir=models_dir)
-compare_conditions(sdata, 'PMissingMorphemes','A', 'C', save.full.model='exp1_morph_AC', models_dir=models_dir)
-compare_conditions(sdata, 'PMissingMorphemes', save.full.model='exp1_morph_numeric', models_dir=models_dir)
 
 compare_conditions(sdata, 'PMissingDigits', 'A', 'B', save.full.model='exp1_digits_AB', models_dir=models_dir)
 compare_conditions(sdata, 'PMissingDigits', 'B', 'C', save.full.model='exp1_digits_BC', models_dir=models_dir)
-compare_conditions(sdata, 'PMissingDigits', 'A', 'C', save.full.model='exp1_digits_AC', models_dir=models_dir)
-compare_conditions(sdata, 'PMissingDigits', save.full.model='exp1_digits_numeric', models_dir=models_dir)
 
 compare_conditions(sdata, 'PMissingClasses', 'A', 'B', save.full.model='exp1_class_AB', models_dir=models_dir)
 compare_conditions(sdata, 'PMissingClasses', 'B', 'C', save.full.model='exp1_class_BC', models_dir=models_dir)
-compare_conditions(sdata, 'PMissingClasses', 'A', 'C', save.full.model='exp1_class_AC', models_dir=models_dir)
+
+
+#-- Additional analyses
+
+block_effect(sdata, 'PMissingMorphemes')
+
+cond_block_interaction(sdata, 'PMissingMorphemes')

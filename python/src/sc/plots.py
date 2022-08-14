@@ -7,7 +7,7 @@ from sc.analyze import get_value_per_subj_and_cond
 
 
 #---------------------------------------------------------------------------
-def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None):
+def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None, cond_names=None, colors=('grey', )*10):
     """
     Plot the mean value for each condition
     """
@@ -24,7 +24,8 @@ def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None,
 
     fig = plt.figure(figsize=fig_size)
 
-    plt.bar(range(n_conds), cond_means, color='grey', zorder=10)
+    for i in range(n_conds):
+        plt.bar(i, cond_means[i], color=colors[i], zorder=10)
 
     ax = plt.gca()
 
@@ -35,7 +36,8 @@ def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None,
 
 
 #---------------------------------------------------------------------------
-def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_ticks, fig_size, cond_names, conditions=None, dependent_var_names=None,
+def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_ticks, fig_size, cond_names=None, conditions=None,
+                                      cond_factor='Condition', dependent_var_names=None,
                                       cond_comparison_text=None, colors=None, font_size=None, show_legend=True, visible_y_labels=1):
     """
     Plot the mean value for each condition - multiple measures
@@ -57,12 +59,12 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
     :param show_legend: Whether or not to plot the legend
     """
 
-    conds_in_df = df.Condition.unique()
-    assert sum(_isempty(c) for c in conds_in_df) == 0, "The 'Condition' column is empty in some rows"
+    conds_in_df = df[cond_factor].unique()
+    assert sum(_isempty(c) for c in conds_in_df) == 0, "The '{}' column is empty in some rows".format(cond_factor)
 
     if conditions is None:
-        conditions = sorted(df.Condition.unique())
-    elif sorted(conditions) != sorted(df.Condition.unique()):
+        conditions = sorted(df[cond_factor].unique())
+    elif sorted(conditions) != sorted(df[cond_factor].unique()):
         print("Warning: conditions are not identical with what's available in the data")
 
     n_conds = len(conditions)
@@ -81,14 +83,14 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
     mean_per_var_and_cond = {}
     for dependent_var in dependent_vars:
         for i_cond, cond in enumerate(conditions):
-            mean_per_var_and_cond[(dependent_var, cond)] = df[df.Condition == cond][dependent_var].mean()
+            mean_per_var_and_cond[(dependent_var, cond)] = df[df[cond_factor] == cond][dependent_var].mean()
 
     #-- Plot!
 
     fig = plt.figure(figsize=fig_size)
 
     for i_cond, cond in enumerate(conditions):
-        # mean_per_dv = [df[df.Condition == cond][dependent_var].mean() for dependent_var in dependent_vars]
+        # mean_per_dv = [df[df[cond_factor] == cond][dependent_var].mean() for dependent_var in dependent_vars]
         mean_per_dv = [mean_per_var_and_cond[(dependent_var, cond)] for dependent_var in dependent_vars]
         x = [i_dv*(n_conds+1) + i_cond for i_dv in range(len(dependent_vars))]
         plt.bar(x, mean_per_dv, color=colors[i_cond], zorder=10)
@@ -117,6 +119,100 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
 
     if show_legend:
         plt.legend([cond_names[c] for c in conditions], fontsize=font_size)
+
+    plt.savefig(out_fn)
+    plt.close(fig)
+
+
+#---------------------------------------------------------------------------
+def plot_cond_means_multiple(datasets, dependent_var, out_fn, ymax, d_y_ticks, fig_size, cond_names=None, conditions=None,
+                             cond_factor='block', ds_names=None,
+                             cond_comparison_text=None, colors=None, font_size=None, show_legend=True, visible_y_labels=1,
+                             legend_title=None, xlim=None):
+    """
+    Plot the mean value for each condition - multiple measures
+
+    :param datasets: a list of data frames
+    :param dependent_vars: List of variables to plot (columns in df)
+    :param out_fn: Output pdf/png file name
+    :param ymax: Maximal y axis value
+    :param d_y_ticks: Delta between y ticks
+    :param fig_size: (width, height)
+    :param cond_names: Name of each condition (for legend)
+    :param conditions: List of conditions to compare
+    :param ds_names: Names of each dependent variable (for x axis)
+    :param cond_comparison_text: List of lists - one list for each dependent variable.
+                    The inner list contains #conditions-1 texts to print as significance-comparison between adjacent conditions.
+    :param colors: List of bar colors - one per condition
+    :param font_size:
+    :param visible_y_labels: which y labels should be plotted (unplotted labels only have ticks)
+    :param show_legend: Whether or not to plot the legend
+    """
+
+    conds_per_df = [set(df[cond_factor]) for df in datasets]
+    conds_in_data = {c for s in conds_per_df for c in s}
+    assert sum(_isempty(c) for c in conds_in_data) == 0, "The '{}' column is empty in some rows".format(cond_factor)
+    assert sum(s != conds_in_data for s in conds_per_df) == 0, "The list of {}s is not the same for all datasets".format(cond_factor)
+
+    if conditions is None:
+        conditions = sorted(conds_in_data)
+    elif sorted(conditions) != sorted(conds_in_data):
+        print("Warning: conditions are not identical with what's available in the data")
+
+    n_conds = len(conditions)
+    if colors is None:
+        colors = ['grey'] * n_conds
+
+    if cond_names is None:
+        cond_names = {c: c for c in conditions}
+    else:
+        assert len(cond_names) == n_conds, 'Invalid cond_names: got {} condition names, expecting {}'.format(len(cond_names), n_conds)
+
+    if ds_names is None:
+        ds_names = [i+1 for i in range(len(datasets))]
+
+    # -- Get data
+    mean_per_df_and_cond = {}
+    for i_df, df in enumerate(datasets):
+        for i_cond, cond in enumerate(conditions):
+            mean_per_df_and_cond[(i_df, cond)] = df[df[cond_factor] == cond][dependent_var].mean()
+
+    #-- Plot!
+
+    fig = plt.figure(figsize=fig_size)
+
+    for i_cond, cond in enumerate(conditions):
+        mean_per_ds = [mean_per_df_and_cond[(i, cond)] for i in range(len(datasets))]
+        x = [i_df*(n_conds+1)+i_cond for i_df in range(len(datasets))]
+        plt.bar(x, mean_per_ds, color=colors[i_cond], zorder=10)
+
+    ax = plt.gca()
+
+    _format_conds_graph(ax, conditions, d_y_ticks, n_conds, ymax, font_size=font_size, x_labels=False, visible_y_labels=visible_y_labels)
+    ax.set_xticks([i_df*(n_conds+1)+((n_conds+1) / 2 - 1) for i_df in range(len(datasets))])
+    ax.set_xticklabels(ds_names, fontsize=font_size)
+    ax.set_ylabel('Error rate', fontsize=font_size)
+
+    if cond_comparison_text is not None:
+        cmp_lines_x_offset = 0.1
+        assert len(cond_comparison_text) == len(datasets), "cond_comparison_text must be a list with {} lists".format(len(datasets))
+        for i_df, cct in enumerate(cond_comparison_text):
+            assert not isinstance(cct, str), "cond_comparison_text must be a list of {} lists".format(len(datasets))
+            assert len(cct) == n_conds - 1, "cond_comparison_text[{}] has {} elements, expecting {}".format(i_df, len(cct), n_conds)
+
+            for i_cond in range(n_conds - 1):
+                x_bar1 = i_df * (n_conds+1) + i_cond
+                x1 = x_bar1 + cmp_lines_x_offset
+                x2 = x_bar1 + 1 - cmp_lines_x_offset
+                y1 = mean_per_df_and_cond[(i_df, conditions[i_cond])]
+                y2 = mean_per_df_and_cond[(i_df, conditions[i_cond+1])]
+                sc.utils.plot_bar_comparison(ax, x1, x2, y1, y2, 0.02, cct[i_cond], 0.005)
+
+    if xlim is not None:
+        plt.xlim(xlim)
+
+    if show_legend:
+        plt.legend([cond_names[c] for c in conditions], fontsize=font_size, title=legend_title)
 
     plt.savefig(out_fn)
     plt.close(fig)

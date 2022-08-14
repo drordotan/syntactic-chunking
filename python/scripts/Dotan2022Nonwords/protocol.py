@@ -14,15 +14,25 @@ GREENS = ('#455C41', '#62845C', '#79A472', '#A2D49A', '#C1F7B8')
 GREEN = GREENS[2]
 
 
-data = pd.read_excel(d+'data_coded.xlsx')
+data = pd.read_excel(d+'data_clean.xlsx')
 
 
+#-- Figure: Comparison of conditions (P:FigCmpConds)
 sc.plots.plot_cond_means_multiple_measures(data, dependent_vars=['PMissingMorphemes', 'PMissingDigits', 'PMissingClasses'],
-                                           out_fn=fig_dir+'cond_mean_all.pdf', ymax=0.38, d_y_ticks=.1, fig_size=(6, 2),
+                                           out_fn=fig_dir+'cond_mean_all.pdf', ymax=0.38, d_y_ticks=.1, fig_size=(8, 2),
                                            cond_names=dict(A='A (grammatical)', B='B', C='C (fragmented)'), conditions=('A', 'B', 'C'),
-                                           dependent_var_names=('Morpheme errors', 'Digit errors', 'Class errors'), colors=GREENS, font_size=8)
+                                           dependent_var_names=('Morpheme errors', 'Stem errors', 'Class errors'), colors=GREENS, font_size=8)
 
 
+#-- Figure: Learning from block to block  (P:FigCmpBlocks)
+sc.plots.plot_cond_means_multiple([data[data.Condition == 'A'], data[data.Condition == 'B'], data[data.Condition == 'C']],
+                                  dependent_var='PMissingMorphemes',
+                                  cond_factor='block', conditions=(1, 2, 3),
+                                  out_fn=fig_dir+'block_mean_per_cond.pdf', ymax=0.38, d_y_ticks=.1, fig_size=(6, 2),
+                                  xlim=(-1, 12),
+                                  ds_names=['Condition A', 'Condition B', 'Condition C'], colors=GREENS, font_size=8, legend_title='Block')
+
+#-- Figure: Comparison of conditions, single-subject level (P:FigCmpConds)
 subj_grouping = [
     #-- B < A, C
     ('SC16', 'SC23', 'SC18', 'SC13',),
@@ -34,13 +44,16 @@ subj_grouping = [
 
     #-- Mismatches
     ('SC10', 'SC20', ),  # A > B > C
-    ('SC11', 'SC21', 'SC3'),  # B > C, A
+    ('SC3', ),  # B > C, A
 ]
 
 sc.plots.plot_cond_means_per_subject(data, 'PMissingMorphemes', fig_dir+'per_subj_morph.pdf', ymax=0.52, fig_size=(6, 6),
-                                      y_label='Morpheme error rate', subj_grouping=subj_grouping, colors=('black', ) + GREENS)
+                                     y_label='Morpheme error rate', subj_grouping=subj_grouping, colors=('black', ) + GREENS)
 
-#-- Analysis of word order (PStat:FigExp1PositionEffect
+
+#--------- Not in ms.
+
+#-- Analysis of word order
 datawords = pd.read_csv(d+'data_coded_words.csv')
 
 sc.plots.plot_digit_accuracy_per_position(datawords, save_as=fig_dir+'acc_per_pos_new.pdf',
