@@ -118,7 +118,8 @@ class ErrorAnalyzer(object):
 
             if 'manual' in self.in_col_names:
                 nrep = sum('repeat' in str(in_ws.cell(rownum, col_inds[self.in_col_names['manual']]).value) for rownum in range(2, in_ws.max_row+1))
-                print('{}: {} excluded&repeated trials'.format(worksheet.title(), nrep))
+                if nrep > 0:
+                    print('{}: {} excluded&repeated trials'.format(worksheet.title(), nrep))
 
             for rownum in range(2, in_ws.max_row+1):
                 if self.fixed_value_per_subject is not None and worksheet in self.fixed_value_per_subject:
@@ -236,6 +237,7 @@ class ErrorAnalyzer(object):
             n_phonerr = [n for n in n_phonerr if not _isnull(n)]
             if sum(not isinstance(n, (int, float)) for n in n_phonerr) > 0:
                 print('Error in line {}: invalid number of phonological errors ({})'.format(rownum, n_phonerr))
+                n_phonerr = 0
             else:
                 n_phonerr = sum(n_phonerr)
                 self._save_value(out_ws, out_rownum, 'NPhonologicalErrors', n_phonerr)

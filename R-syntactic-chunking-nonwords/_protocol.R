@@ -34,11 +34,23 @@ compare_conditions(sdata, 'PMissingClasses', 'A', 'B', save.full.model='exp1_cla
 compare_conditions(sdata, 'PMissingClasses', 'B', 'C', save.full.model='exp1_class_BC', models_dir=models_dir)
 
 
-#-- Additional analyses
+#-- Effect of learning from block to block
 
 block_effect(sdata, 'PMissingMorphemes')
 block_effect(sdata[sdata$Condition == 'A',], 'PMissingMorphemes')
 block_effect(sdata[sdata$Condition == 'B',], 'PMissingMorphemes')
 block_effect(sdata[sdata$Condition == 'C',], 'PMissingMorphemes')
 
-#cond_block_interaction(sdata, 'PMissingMorphemes')
+cond_block_interaction_non_numeric(sdata, 'PMissingMorphemes')
+
+#-- Effect of learning inside the first block
+sdata$quartile = floor(as.numeric(sdata$ItemNum) / 4) + 1
+for (block in 1:3) {
+  cat('\n')
+  print(sprintf('Block %d', block))
+  block_effect(sdata[sdata$block == block & sdata$Condition == 'A',], 'PMissingMorphemes', block_field = 'quartile')
+  block_effect(sdata[sdata$block == block & sdata$Condition == 'B',], 'PMissingMorphemes', block_field = 'quartile')
+  block_effect(sdata[sdata$block == block & sdata$Condition == 'C',], 'PMissingMorphemes', block_field = 'quartile')
+  block_effect(sdata[sdata$block == block,], 'PMissingMorphemes', block_field = 'quartile')
+}
+

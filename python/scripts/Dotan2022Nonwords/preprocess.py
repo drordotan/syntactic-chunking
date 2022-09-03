@@ -1,6 +1,7 @@
 import sc
 import pandas as pd
 import mtl.stats as ms
+import re
 
 base_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking nonwords/data/'
 recalc_exclusions = False
@@ -30,6 +31,8 @@ def exclude_outliers(df):
     phon_outlier = ms.outlier(subj_sum.phonol_error)
     phon_outlier_ids = [sid for sid, o in zip(subj_sum.index, phon_outlier) if o]
     print('{} participants are outliers due to phonological errors: {}'.format(sum(phon_outlier), ', '.join(phon_outlier_ids)))
+
+    [print('{:.1f}%'.format(a*100)) for a in sorted(subj_sum.phonol_error)]
 
     morph_outlier = ms.outlier(subj_sum.PMissingMorphemes)
     morph_outlier_ids = [sid for sid, o in zip(subj_sum.index, morph_outlier) if o]
@@ -79,6 +82,19 @@ def add_fields(data_fn):
 
 
 #-----------------------------------------------------------------------------------------------------------------------
+def subj_id_mapping(df):
+    result = {}
+    for subject in df.Subject.unique():
+        m = re.match('^SC(\\d+$)', subject)
+        if m is None:
+            print('ERROR: Invalid subject ID format ({}) - not changed')
+            result[subject] = subject
+        else:
+            result[subject] = int(m.group(1))
+
+    return result
+
+#-----------------------------------------------------------------------------------------------------------------------
 
 cond_order_info = load_participant_conditions(base_dir + 'participants & conditions.xlsx', load_excluded=recalc_exclusions)
 
@@ -97,6 +113,9 @@ all_data = add_fields(base_dir+'data_coded.xlsx')
 if recalc_exclusions:
     all_data = exclude_subjects_with_too_many_excluded_trials(all_data)
     all_data = exclude_outliers(all_data)
+
+subj_id = subj_id_mapping(all_data)
+all_data.Subject = [subj_id[s] for s in all_data.Subject]
 
 all_data.to_excel(base_dir+'data_clean.xlsx', index=False)
 all_data.to_csv(base_dir+'data_clean.csv', index=False)

@@ -32,19 +32,36 @@ sc.plots.plot_cond_means_multiple([data[data.Condition == 'A'], data[data.Condit
                                   xlim=(-1, 12),
                                   ds_names=['Condition A', 'Condition B', 'Condition C'], colors=GREENS, font_size=8, legend_title='Block')
 
+#-- Figure: Learning within the first block (P:FigCmpBlockPart)
+data['quartile'] = [(i-1) // 8 + 1 for i in data.ItemNum]
+for i_cond, cond in enumerate(('A', 'B', 'C')):
+    sc.plots.plot_performance_progress(data[data.Condition == cond],
+                                       dependent_var='PMissingMorphemes', ylabel='Morpheme error rate',
+                                       out_fn=fig_dir+'progress_cond{}.pdf'.format(cond),
+                                       ymax=0.41, d_y_ticks=.1, fig_size=(4, 1),
+                                       cond_names=dict(A='A (grammatical)', B='B', C='C (fragmented)'),
+                                       colors=[GREENS[i_cond]],
+                                       font_size=8,
+                                       show_legend=False,
+                                       show_xticks=i_cond == 2,
+                                       xlabel='Time in experiment (block, quartile)' if i_cond == 2 else None
+                                       )
+
 #-- Figure: Comparison of conditions, single-subject level (P:FigCmpConds)
 subj_grouping = [
-    #-- B < A, C
-    ('SC16', 'SC23', 'SC18', 'SC13',),
-    ('SC23', 'SC24', 'SC27', 'SC2',  ),
+    #-- Good effect (with bathtub): B < A, C
+    (2, 13, 16, 18, 23,),
+    (24, 26, 27, 28, 30,),
 
-    ( 'SC6', 'SC7', 'SC8', 'SC19', 'SC12', 'SC5',), #-- A < B < C
+    #-- Good effect (no bathtub): A < B < C
+    (5, 6, 12, 19, 35,),
 
-    ('SC17',  'SC9', 'SC22', ),  # A=B=C
+    #-- No effect
+    (9, 14, 17, 22,),  # A=B=C
 
-    #-- Mismatches
-    ('SC10', 'SC20', ),  # A > B > C
-    ('SC3', ),  # B > C, A
+    #-- Mismatching effects
+    (10, 20, 33,),  # A > B > C
+    (3, 7, 31, 32,),  # B > C, A
 ]
 
 sc.plots.plot_cond_means_per_subject(data, 'PMissingMorphemes', fig_dir+'per_subj_morph.pdf', ymax=0.52, fig_size=(6, 6),

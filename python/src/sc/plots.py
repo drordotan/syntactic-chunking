@@ -128,7 +128,7 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
 def plot_cond_means_multiple(datasets, dependent_var, out_fn, ymax, d_y_ticks, fig_size, cond_names=None, conditions=None,
                              cond_factor='block', ds_names=None, ylabel='Error rate',
                              cond_comparison_text=None, colors=None, font_size=None, show_legend=True, visible_y_labels=1,
-                             legend_title=None, xlim=None):
+                             legend_title=None, xlim=None, xlabel=None):
     """
     Plot the mean value for each condition - multiple measures
 
@@ -192,6 +192,8 @@ def plot_cond_means_multiple(datasets, dependent_var, out_fn, ymax, d_y_ticks, f
     ax.set_xticks([i_df*(n_conds+1)+((n_conds+1) / 2 - 1) for i_df in range(len(datasets))])
     ax.set_xticklabels(ds_names, fontsize=font_size)
     ax.set_ylabel(ylabel, fontsize=font_size)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel, fontsize=font_size)
 
     if cond_comparison_text is not None:
         cmp_lines_x_offset = 0.1
@@ -219,6 +221,149 @@ def plot_cond_means_multiple(datasets, dependent_var, out_fn, ymax, d_y_ticks, f
 
 
 #---------------------------------------------------------------------------
+def plot_performance_progress(df, dependent_var, ylabel, out_fn, ymax, d_y_ticks, fig_size, cond_names=None,
+                             colors=None, font_size=None, show_legend=True, visible_y_labels=1,
+                             legend_title=None, xlim=None, xlabel=None, show_xticks=True, stderr=True):
+    """
+    Plot the mean value for each condition - multiple measures
+
+    :param datasets: a list of data frames
+    :param dependent_vars: List of variables to plot (columns in df)
+    :param out_fn: Output pdf/png file name
+    :param ymax: Maximal y axis value
+    :param d_y_ticks: Delta between y ticks
+    :param fig_size: (width, height)
+    :param cond_names: Name of each condition (for legend)
+    :param conditions: List of conditions to compare
+    :param ds_names: Names of each dependent variable (for x axis)
+    :param cond_comparison_text: List of lists - one list for each dependent variable.
+                    The inner list contains #conditions-1 texts to print as significance-comparison between adjacent conditions.
+    :param colors: List of bar colors - one per condition
+    :param font_size:
+    :param visible_y_labels: which y labels should be plotted (unplotted labels only have ticks)
+    :param show_legend: Whether or not to plot the legend
+    """
+
+    conditions = sorted(df.Condition.unique())
+    n_conds = len(conditions)
+    if colors is None:
+        colors = ['grey'] * n_conds
+
+    if cond_names is None:
+        cond_names = {c: c for c in conditions}
+
+    #-- Get the data
+    x_per_block_and_quartile, all_x, x_desc = _get_x_per_block_and_quartile(df)
+    data_per_cond = get_data_per_cond_block_quartile(df, dependent_var, x_per_block_and_quartile)
+
+    #-- Plot!
+
+    fig = plt.figure(figsize=fig_size)
+    plt.clf()
+    ax = plt.gca()
+
+    for i_cond, cond in enumerate(conditions):
+        for cond_data in data_per_cond[cond]:
+            x = cond_data['x']
+            y = cond_data['y']
+            se = cond_data['se']
+            ax.plot(x, y, color=colors[i_cond], linewidth=0.5, marker='o', markersize=4, zorder=10)
+            if stderr:
+                ax.fill_between(x, y-se, y+se, color=colors[i_cond], alpha=0.2, linewidth=0, zorder=5)
+
+    ax = plt.gca()
+
+    if ymax is not None:
+        plt.ylim([0, ymax])
+
+    if show_xticks:
+        ax.set_xticks(all_x)
+        ax.set_xticklabels(x_desc, fontsize=font_size)
+    else:
+        ax.set_xticks([])
+
+    set_yticks(ax, d_y_ticks, font_size, visible_y_labels)
+    ax.tick_params('x', length=0, width=0)
+    ax.tick_params('y', length=0, width=0)
+
+    ax.grid(axis='y', color=[0.9]*3, linewidth=0.5, zorder=0)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.set_ylabel(ylabel, fontsize=font_size)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel, fontsize=font_size)
+
+    if xlim is not None:
+        plt.xlim(xlim)
+
+    if show_legend:
+        plt.legend([cond_names[c] for c in conditions], fontsize=font_size, title=legend_title)
+
+    plt.savefig(out_fn)
+    plt.close(fig)
+
+
+def get_data_per_cond_block_quartile(df, dependent_var, x_per_block_and_quartile):
+    """
+    Get the mean data for each condition, block, and quartile
+    Returns x and y data, each with the same structure:
+    result[condition] - array with #blocks entries, each is an array with #quartiles x/y values
+    """
+
+    result = {}
+
+    for cond in df.Condition.unique():
+        cdf = df[df.Condition == cond]
+        result[cond] = []
+
+        for block in sorted(df.block.unique()):
+            block_x = []
+            block_y = []
+            block_se = []
+            for quartile in sorted(df.quartile.unique()):
+                qdf = cdf[(cdf.block == block) & (cdf.quartile == quartile)]
+                mean_per_subject = [qdf[qdf.Subject == s][dependent_var].mean() for s in qdf.Subject.unique()]
+                block_x.append(x_per_block_and_quartile[block][quartile])
+                block_y.append(np.mean(mean_per_subject))
+                block_se.append(np.std(mean_per_subject) / math.sqrt(len(mean_per_subject)))
+
+            result[cond].append(dict(x=np.array(block_x),
+                                     y=np.array(block_y),
+                                     se=np.array(block_se)))
+
+    return result
+
+
+#---------------------------------------------------------------------------
+def _get_x_per_block_and_quartile(df):
+    """
+    Get the X coordinate in which each block/quartile will be plotted.
+    Returns a 2-level dict: x = result[block][quartile]
+    """
+
+    x_per_block_and_quartile = {}
+    all_x = []
+    x_desc = []
+
+    x = 0
+    for block in sorted(df.block.unique()):
+        x_per_block_and_quartile[block] = {}
+        bdf = df[df.block == block]
+
+        for quartile in sorted(bdf.quartile.unique()):
+            x_per_block_and_quartile[block][quartile] = x
+            all_x.append(x)
+            x_desc.append('Q{}'.format(quartile))
+            x += 1
+
+        x += 1
+
+    return x_per_block_and_quartile, all_x, x_desc
+
+
+#---------------------------------------------------------------------------
 def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=True, cond_names=None, visible_y_labels=None):
     """
     :param visible_y_labels: If specified (int), show only every nth y label
@@ -235,13 +380,13 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
 
     set_yticks(ax, dy, font_size, visible_y_labels)
 
+    ax.tick_params('x', length=0, width=0)
+    ax.tick_params('y', length=0, width=0)
+
     ax.grid(axis='y', color=[0.9]*3, linewidth=0.5, zorder=0)
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-
-    ax.tick_params('x', length=0, width=0)
-    ax.tick_params('y', length=0, width=0)
 
 
 #---------------------------------------------------------------------------
@@ -366,7 +511,7 @@ def plot_subject_group(df, dependent_var, subj_ids, conditions, cond_names, ax, 
                 ax.text(xx, yy+cond_order_text_dy, txt, fontsize=6, horizontalalignment='center', color='white', zorder=20)
 
     _format_conds_graph(ax, conditions, dy, len(conditions), ymax, font_size=font_size, cond_names=cond_names)
-    ax.legend([str(s) for s in subj_ids], fontsize=5)
+    ax.legend([str(s) for s in subj_ids], fontsize=5, ncol=1 if len(subj_ids) <= 3 else 2)
 
 
 #---------------------------------------------------------------------------
