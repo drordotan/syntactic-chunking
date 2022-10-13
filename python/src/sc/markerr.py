@@ -104,7 +104,7 @@ class ErrorAnalyzer(object):
         out_row_num = 2
 
         for worksheet in worksheets:
-            print('\nProcessing worksheet [{}]...'.format(worksheet))
+            print('\nProcessing worksheet "{}"...'.format(worksheet))
 
             try:
                 in_ws, col_inds = self._open_worksheet(wb, worksheet, in_fn)

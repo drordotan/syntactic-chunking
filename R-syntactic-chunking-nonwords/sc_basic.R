@@ -72,7 +72,11 @@ compare_conditions <- function(sdata, dependent_var, cond1=NA, cond2=NA, item_in
 
 #--------------------------------------------------------------------------------------------------
 block_effect <- function(sdata, dependent_var, item_intercept=TRUE, save.full.model=NA, models_dir=NA, block_as_numeric_factor=TRUE,
-                         block_field='block') {
+                         block_field='block', header_line=NA) {
+  
+  if (! is.na(header_line)) {
+    print(header_line)
+  }
   
   item_intercept_factor = ifelse(item_intercept, ' + (1|ItemNum)', '')
   

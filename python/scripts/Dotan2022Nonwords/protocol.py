@@ -8,6 +8,7 @@ mpl.rcParams['ps.fonttype'] = 42
 
 d = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking nonwords/data/'
 fig_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking nonwords/figures/'
+fn_real_words = '/Users/dror/data/acad-proj/4-Published/2022 syntactic chunking Nadin/data/exp1&2/data_coded.xlsx'
 
 RED = '#BF5860'
 GREENS = ('#455C41', '#62845C', '#79A472', '#A2D49A', '#C1F7B8')
@@ -50,11 +51,12 @@ for i_cond, cond in enumerate(('A', 'B', 'C')):
 #-- Figure: Comparison of conditions, single-subject level (P:FigCmpConds)
 subj_grouping = [
     #-- Good effect (with bathtub): B < A, C
-    (2, 13, 16, 18, 23,),
-    (24, 26, 27, 28, 30,),
+    (13, 16, 18, 23, 24,),
+    (26, 28, 30, 39),
+    (2, 25, 27, 36,),
 
     #-- Good effect (no bathtub): A < B < C
-    (5, 6, 12, 19, 35,),
+    (5, 6, 12, 19, 35, 38),
 
     #-- No effect
     (9, 14, 17, 22,),  # A=B=C
@@ -67,6 +69,13 @@ subj_grouping = [
 sc.plots.plot_cond_means_per_subject(data, 'PMissingMorphemes', fig_dir+'per_subj_morph.pdf', ymax=0.52, fig_size=(6, 6),
                                      y_label='Morpheme error rate', subj_grouping=subj_grouping, colors=('black', ) + GREENS)
 
+
+#-- Compare effect size in this experiment vs. in real words (Dotan & Brutmann 2022)
+data_real_numbers_exp1 = pd.read_excel(fn_real_words)
+
+sc.analyze.compare_effect_size('PMissingMorphemes', data_real_numbers_exp1, data[data.Subject <= 35],
+                               conds1=('B', 'D'), conds2=('B', 'C'),
+                               expnames=('Words', 'Nonwords'))
 
 #--------- Not in ms.
 

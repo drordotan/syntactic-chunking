@@ -143,9 +143,12 @@ def compare_effect_size(dependent_var, df1, df2, conds1=None, conds2=None, expna
     print('Effect size of {} in experiment {} = {:.2f}%, in experiment {} = {:.2f}%;'.
           format(dependent_var, expnames[0], np.mean(effect_sizes_1) * 100, expnames[1], np.mean(effect_sizes_2) * 100), end='')
     if np.mean(effect_sizes_1) > np.mean(effect_sizes_2):
-        print(' t({}) = {:.3f}, one-tailed p={}'.format(len(effect_sizes_1) + len(effect_sizes_2) - 2, t, mu.p_str(p/2)))
+        print(' unpaired t({}) = {:.3f}, one-tailed p={}'.format(len(effect_sizes_1) + len(effect_sizes_2) - 2, t, mu.p_str(p/2)))
     else:
         print('opposite to predicted direction')
+
+    print('No. of participants in the predicted direction: {} in experiment {}, {} in experiment {}'.
+          format(sum(np.array(effect_sizes_1) >= 0), expnames[0], sum(np.array(effect_sizes_2) >= 0), expnames[1]))
 
 
 def _get_effect_size(df, conds, dependent_var):
