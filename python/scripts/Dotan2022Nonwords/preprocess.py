@@ -4,7 +4,7 @@ import mtl.stats as ms
 import re
 
 base_dir = '/Users/dror/data/acad-proj/2-InProgress/syntactic chunking nonwords/data/'
-recalc_exclusions = True
+recalc_exclusions = False
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -110,9 +110,10 @@ print('Loading data of {} subjects...'.format(len(cond_order_info['subjid'])))
 
 analyzer = sc.markerr.ErrorAnalyzer(consider_thousand_as_digit=False,
                                     digit_mapping=dict(F=2, T=3, L=4, K=5, B=6, P=7, A=8, S=9, X=0, x=0),
+                                    unknown_response_chars=('-', '?', 'd'),
                                     in_col_names=dict(block=None, nwords=None), subj_id_in_xls=False,
                                     phonological_error_flds=('phonerr - >1 feature', 'more than 1 phonerr'),
-                                    set_per_subject=cond_order_info)
+                                    set_per_subject=cond_order_info, save_verbal_response=True)
 
 analyzer.run_for_worksheets(base_dir+'raw-data.xlsx', out_dir=base_dir, worksheets=cond_order_info['subjid'])
 

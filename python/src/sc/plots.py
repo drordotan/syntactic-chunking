@@ -36,9 +36,9 @@ def plot_cond_means(df, dependent_var, out_fn, ymax=None, dy=0.1, fig_size=None,
 
 
 #---------------------------------------------------------------------------
-def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_ticks, fig_size, cond_names=None, conditions=None,
-                                      cond_factor='Condition', dependent_var_names=None,
-                                      cond_comparison_text=None, colors=None, font_size=None, show_legend=True, visible_y_labels=1):
+def plot_cond_means_multiple_measures(df, dependent_vars, out_fn=None, ymax=None, d_y_ticks=None, fig_size=None, cond_names=None, conditions=None,
+                                      cond_factor='Condition', dependent_var_names=None, cond_comparison_text=None,
+                                      colors=None, font_size=None, show_legend=True, visible_y_labels=1, print_means=False):
     """
     Plot the mean value for each condition - multiple measures
 
@@ -55,8 +55,10 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
                     The inner list contains #conditions-1 texts to print as significance-comparison between adjacent conditions.
     :param colors: List of bar colors - one per condition
     :param font_size:
-    :param visible_y_labels: which y labels should be plotted (unplotted labels only have ticks)
+    :param visible_y_labels: which y labels should be plotted (unplotted labels only have ticks): 1 = all, 2 = every 2nd label etc.
+              None = all invisible.
     :param show_legend: Whether or not to plot the legend
+    :param print_means: whether to print mean values to console.
     """
 
     conds_in_df = df[cond_factor].unique()
@@ -95,6 +97,10 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
         x = [i_dv*(n_conds+1) + i_cond for i_dv in range(len(dependent_vars))]
         plt.bar(x, mean_per_dv, color=colors[i_cond], zorder=10)
 
+        if print_means:
+            for dependent_var in dependent_vars:
+                print('{} condition {}: {:.1f}%'.format(dependent_var, cond, mean_per_var_and_cond[(dependent_var, cond)]*100))
+
     ax = plt.gca()
 
     _format_conds_graph(ax, conditions, d_y_ticks, n_conds, ymax, font_size=font_size, x_labels=False, visible_y_labels=visible_y_labels)
@@ -120,7 +126,8 @@ def plot_cond_means_multiple_measures(df, dependent_vars, out_fn, ymax, d_y_tick
     if show_legend:
         plt.legend([cond_names[c] for c in conditions], fontsize=font_size)
 
-    plt.savefig(out_fn)
+    if out_fn is not None:
+        plt.savefig(out_fn)
     plt.close(fig)
 
 
@@ -378,7 +385,8 @@ def _format_conds_graph(ax, conditions, dy, n_conds, ymax, font_size, x_labels=T
     else:
         ax.set_xticks([])
 
-    set_yticks(ax, dy, font_size, visible_y_labels)
+    if dy is not None:
+        set_yticks(ax, dy, font_size, visible_y_labels)
 
     ax.tick_params('x', length=0, width=0)
     ax.tick_params('y', length=0, width=0)

@@ -10,7 +10,7 @@ load_data <- function(filename, useNErrExcludingOrder=FALSE) {
 
 #--------------------------------------------------------------------------------------------------
 compare_conditions <- function(sdata, dependent_var, cond1=NA, cond2=NA, item_intercept=TRUE, save.full.model=NA, models_dir=NA,
-                               cond_order_numeric=FALSE, block='order') {
+                               cond_order_numeric=FALSE, block='order', print_means=FALSE) {
   
   numeric_condition = is.na(cond1)
   
@@ -30,6 +30,11 @@ compare_conditions <- function(sdata, dependent_var, cond1=NA, cond2=NA, item_in
     } else {
       sdata$cond_order = cond1_order < cond2_order
     }
+  }
+  
+  if (print_means) {
+    print(sprintf('Condition %s %s = %.2f%%', cond1, dependent_var, mean(sdata[sdata$Condition == cond1, dependent_var]) * 100))
+    print(sprintf('Condition %s %s = %.2f%%', cond2, dependent_var, mean(sdata[sdata$Condition == cond2, dependent_var]) * 100))
   }
   
   if (is.na(block)) {

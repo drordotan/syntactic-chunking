@@ -18,9 +18,10 @@ lexical_classes = hebnum.ones, hebnum.tens, hebnum.hundreds, hebnum.thousands
 class ErrorAnalyzer(object):
 
     #------------------------------------------------------
-    def __init__(self, digit_mapping=None, subj_id_transformer=None, consider_thousand_as_digit=True, accuracy_per_digit=False,
+    def __init__(self, digit_mapping=None, unknown_response_chars=('-', '?'),
+                 subj_id_transformer=None, consider_thousand_as_digit=True, accuracy_per_digit=False,
                  fail_on_segment_order_error=False, subj_id_in_xls=True, in_col_names=None, phonological_error_flds=(),
-                 set_per_subject=None):
+                 set_per_subject=None, save_verbal_response=False):
         """
 
         :param phonological_error_flds: List of xls columns which contain number of phonological errors. All these columns will be summed.
@@ -40,9 +41,13 @@ class ErrorAnalyzer(object):
         self.fail_on_segment_order_error = fail_on_segment_order_error
         self.phonological_error_flds = phonological_error_flds
         self.subj_id_in_xls = subj_id_in_xls
+        self.save_verbal_response = save_verbal_response
+        self.unknown_response_chars = unknown_response_chars
 
         self.in_col_names = dict(block='Block', condition='Condition', itemnum='ItemNum', target='target', response='response',
                                  nwords='NWordsPerTarget', exclude='exclude', manual='manual')
+        if save_verbal_response:
+            self.in_col_names['VerbalResponse'] = 'verbal response'
         if in_col_names is not None:
             for k, v in in_col_names.items():
                 assert k in self.in_col_names, 'Invalid in_col_names - unexpected column "{}"'.format(k)
@@ -209,6 +214,9 @@ class ErrorAnalyzer(object):
 
         subj_id = subj_id if self.subj_id_transformer is None else self.subj_id_transformer(subj_id)
         self._save_value(out_ws, out_rownum, 'Subject', subj_id)
+        if self.save_verbal_response:
+            vr_col = self.in_col_names['VerbalResponse']
+            self._save_value(out_ws, out_rownum, vr_col, in_ws.cell(rownum, col_inds[vr_col]).value)
 
         copy_cols = self.xls_mandatory_cols + tuple([c for c in self.xls_optional_cols if self.in_col_names[c] in col_inds])
         for colname in copy_cols:
@@ -437,7 +445,7 @@ class ErrorAnalyzer(object):
         if response_str in ('+', '!', 'v', 'V'):
             return target_segments
 
-        if response_str == '-':
+        if response_str in self.unknown_response_chars:
             return []
 
         response_str = str(response_str)
@@ -554,10 +562,14 @@ class ErrorAnalyzer(object):
         if segment in ('+', '!'):   # "+" is correct; "!" is TBD
             return ['correct']
 
-        if segment in ('-', '?'):   # "-" means omission; "?" means "I don't know"
+        if segment in self.unknown_response_chars:
             return []
 
-        segment = segment.replace(',', '')  # delete commas
+        #-- delete commas, set the unknown-digit characters to 'x'
+        segment = segment.replace(',', '')
+        for c in self.unknown_response_chars:
+            if c not in ('x', 'X'):
+                segment = segment.replace(c, 'x')
 
         result = verbalnumbers.hebrew.number_to_words(segment, digit_mapping=self._digit_mapping)
 
